@@ -1,0 +1,189 @@
+body {
+  margin: 0;
+  padding: 0;
+}
+:root {
+  --primary-glow: linear-gradient(
+    135deg,
+    #a855f7 0%,
+    #6366f1 50%,
+    #3b82f6 100%
+  );
+  --font-main: "Jost", sans-serif;
+}
+
+/* 1. Universal Centering */
+.main-wrapper {
+  min-height: 100vh;
+  width: 100%;
+  background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-family: var(--font-main);
+  margin: 0;
+  padding: 40px 20px;
+  box-sizing: border-box;
+  text-align: center; /* Ensures text stays centered */
+}
+
+.content-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 850px;
+  width: 100%;
+}
+
+/* 2. Brand Identity */
+.brand-logo {
+  font-size: 2.8rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+/* 3. Hero Text */
+.title {
+  font-size: clamp(3rem, 10vw, 3.5rem);
+  font-weight: 900;
+  margin: 10px 0;
+  letter-spacing: -3px;
+  line-height: 1;
+}
+
+.tagline {
+  color: #94a3b8;
+  font-size: 1.1rem;
+  margin-bottom: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.in-flag {
+  border-radius: 2px;
+}
+
+.description {
+  color: #cbd5e1;
+  line-height: 1.6;
+  font-size: 1.15rem;
+  max-width: 650px;
+  margin-bottom: 40px;
+}
+
+/* 4. Action Button */
+.action-form {
+  margin-bottom: 40px;
+}
+
+.glow-button {
+  background: var(--primary-glow);
+  color: white;
+  border: none;
+  padding: 18px 60px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+  transition: all 0.3s ease;
+  font-family: var(--font-main);
+}
+
+.glow-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 50px rgba(99, 102, 241, 0.5);
+}
+
+/* 5. Social Proof */
+.waiting-counter {
+  margin-top: 20px;
+  color: #94a3b8;
+}
+
+.avatar-stack {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.avatar {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  border: 2px solid #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-left: -10px;
+}
+
+.avatar:first-child {
+  margin-left: 0;
+}
+
+/* 6. Footer */
+.social-icons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+.icon {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+/* The Glow Effect */
+.icon:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #a855f7; /* Matches your brand purple */
+  transform: translateY(-5px);
+  /* This creates the glow */
+  filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.8));
+}
+
+/* Optional: specific glow colors for each platform */
+.icon:hover svg {
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+}
+
+.bottom-bar {
+  margin-top: 40px;
+  font-size: 0.85rem;
+  color: #4b5563;
+  display: flex;
+  gap: 12px;
+}
+
+.divider {
+  color: #374151;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .title {
+    font-size: 3.2rem;
+  }
+  .glow-button {
+    width: 100%;
+    padding: 18px 0;
+  }
+}
