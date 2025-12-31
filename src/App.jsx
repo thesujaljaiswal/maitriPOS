@@ -1,24 +1,19 @@
 import { useState } from "react";
 import { Instagram, Linkedin } from "lucide-react";
 import Snowfall from "react-snowfall";
+import logoImage from "../src/assets/maitriPOS ICON 2 white.png";
 import "./App.css";
 
 function App() {
-  const [email, setEmail] = useState("");
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log("Email captured:", email);
-    alert("You're on the list! 🚀");
-  };
-
   return (
     <div className="main-wrapper">
-      <Snowfall />
+      <Snowfall snowflakeCount={100} />
       <div className="content-card">
         {/* Header Logo */}
         <header className="header">
-          <h1 className="brand-logo">maitriPOS</h1>
+          <h1 className="brand-logo">
+            <img src={logoImage} alt="Logo" />
+          </h1>
         </header>
 
         {/* Hero Section */}
@@ -28,8 +23,9 @@ function App() {
           <p className="tagline">From India, for the world. </p>
 
           <p className="description">
-            The ultimate smart platform for creators. Build digital catalogues,
-            manage orders, and handle seamless payments in one vibe-heavy app.
+            The ultimate smart platform for anyone who loves to create. Build
+            digital catalogues, manage orders, and handle seamless payments in
+            one vibe-heavy app.
           </p>
 
           <a
