@@ -38,8 +38,6 @@ const ManageItems = () => {
     setTimeout(() => setMsg({ text: "", type: "" }), 3000);
   };
 
-  /* ---------------- FETCHERS ---------------- */
-
   const fetchItems = async (id) => {
     const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/item/${id}`, {
       credentials: "include",
@@ -63,15 +61,12 @@ const ManageItems = () => {
         credentials: "include",
       });
       const result = await res.json();
-
       if (!res.ok || !result.data?.length) {
         navigate("/create/store");
         return;
       }
-
       const id = result.data[0]._id;
       setStoreId(id);
-
       await Promise.all([fetchItems(id), fetchCategories(id)]);
     } catch {
       showMsg("Connection error", "error");
@@ -85,15 +80,17 @@ const ManageItems = () => {
   }, [init]);
 
   useEffect(() => {
-    if (!formData.category) {
-      setAvailableSubs([]);
-      return;
-    }
     const cat = categories.find((c) => c._id === formData.category);
     setAvailableSubs(cat?.subcategories || []);
   }, [formData.category, categories]);
 
-  /* ---------------- HELPERS ---------------- */
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -113,63 +110,40 @@ const ManageItems = () => {
     setSelectedItemId(null);
   };
 
-  /* ---------------- CREATE / UPDATE ---------------- */
-
   const handleAction = async (e) => {
     e.preventDefault();
     if (!storeId) return;
-
     setActionLoading(true);
 
     try {
       const data = new FormData();
-      data.append("name", formData.name);
-      data.append("description", formData.description);
-      data.append("category", formData.category);
-      data.append("subCategory", formData.subCategory || "");
-      data.append("isAvailable", String(formData.isAvailable));
-      data.append(
+      Object.keys(formData).forEach((key) => data.append(key, formData[key]));
+      data.set(
         "tags",
         JSON.stringify(formData.tags.split(",").map((t) => t.trim()))
       );
-
-      if (variants.length > 0) {
+      if (variants.length > 0)
         data.append("variants", JSON.stringify(variants));
-      } else {
-        data.append("price", formData.price);
-      }
-
-      if (imageFile && !isEditMode) {
-        data.append("image", imageFile);
-      }
+      if (imageFile && !isEditMode) data.append("image", imageFile);
 
       const url = isEditMode
         ? `${import.meta.env.VITE_API_BASE_URL}/item/update/${selectedItemId}`
         : `${import.meta.env.VITE_API_BASE_URL}/item/${storeId}`;
-
       const res = await fetch(url, {
         method: isEditMode ? "PATCH" : "POST",
         body: data,
         credentials: "include",
       });
+      if (!res.ok) throw new Error("Action failed");
 
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message);
-
-      /* IMAGE UPDATE (EDIT MODE ONLY) */
       if (isEditMode && imageFile) {
         const imgData = new FormData();
         imgData.append("image", imageFile);
-
         await fetch(
           `${
             import.meta.env.VITE_API_BASE_URL
           }/item/update/${selectedItemId}/image`,
-          {
-            method: "PATCH",
-            body: imgData,
-            credentials: "include",
-          }
+          { method: "PATCH", body: imgData, credentials: "include" }
         );
       }
 
@@ -177,15 +151,13 @@ const ManageItems = () => {
       resetForm();
       fetchItems(storeId);
     } catch (err) {
-      showMsg(err.message || "Action failed", "error");
+      showMsg(err.message, "error");
     } finally {
       setActionLoading(false);
     }
   };
 
-  /* ---------------- RENDER ---------------- */
-
-  if (loading) return <div className="mi-loader">Loading...</div>;
+  if (loading) return <div className="mi-loader">Loading Inventory...</div>;
 
   return (
     <>
@@ -195,7 +167,7 @@ const ManageItems = () => {
           <header className="mi-header">
             <div>
               <h1>Inventory</h1>
-              <p>{items.length} Products</p>
+              <p>{items.length} Products Found</p>
             </div>
             <button
               className="mi-btn-add"
@@ -233,12 +205,18 @@ const ManageItems = () => {
                 }}
               >
                 <div className="mi-card-img">
-                  {item.image ? <img src={item.image} /> : "No Image"}
-                  {!item.isAvailable && <span>Unavailable</span>}
+                  {item.image ? (
+                    <img src={item.image} alt={item.name} />
+                  ) : (
+                    "No Image"
+                  )}
+                  {!item.isAvailable && <span>Out of Stock</span>}
                 </div>
                 <h3>{item.name}</h3>
                 <p>
-                  {item.variants?.length ? "Multiple Prices" : `₹${item.price}`}
+                  {item.variants?.length
+                    ? "Multiple Variants"
+                    : `₹${item.price}`}
                 </p>
               </div>
             ))}
@@ -248,8 +226,97 @@ const ManageItems = () => {
         {isModalOpen && (
           <div className="mi-modal-overlay">
             <form className="mi-modal" onSubmit={handleAction}>
-              {/* UI unchanged – already correct */}
-              {/* Submit logic fixed */}
+              <h2>{isEditMode ? "Edit Product" : "New Product"}</h2>
+
+              <div className="mi-form-group">
+                <label>Product Image</label>
+                <div
+                  className="mi-card-img"
+                  style={{ height: "120px", cursor: "pointer" }}
+                  onClick={() => document.getElementById("imgInp").click()}
+                >
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="Preview" />
+                  ) : (
+                    "Click to upload"
+                  )}
+                </div>
+                <input
+                  id="imgInp"
+                  type="file"
+                  hidden
+                  onChange={handleImageChange}
+                />
+              </div>
+
+              <div className="mi-form-group">
+                <label>Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="mi-form-row">
+                <div className="mi-form-group">
+                  <label>Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mi-form-group">
+                  <label>Price (₹)</label>
+                  <input
+                    type="number"
+                    value={formData.price}
+                    onChange={(e) =>
+                      setFormData({ ...formData, price: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="mi-form-group">
+                <label>Description</label>
+                <textarea
+                  rows="3"
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="mi-modal-footer">
+                <button
+                  type="button"
+                  className="btn-cancel"
+                  onClick={resetForm}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-save"
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? "Processing..." : "Save Product"}
+                </button>
+              </div>
             </form>
           </div>
         )}
