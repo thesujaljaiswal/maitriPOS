@@ -7,7 +7,7 @@ export default function Register() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
-    name: "",
+    fullname: "",
     username: "",
     email: "",
     password: "",
@@ -30,9 +30,9 @@ export default function Register() {
 
     setError("");
 
-    const { name, username, email, password } = form;
+    const { fullname, username, email, password } = form;
 
-    if (!name || !username || !email || !password) {
+    if (!fullname || !username || !email || !password) {
       setError("All fields are required");
       return;
     }
@@ -72,7 +72,7 @@ export default function Register() {
       {error && <div className="error">{error}</div>}
 
       <input
-        name="name"
+        name="fullname"
         placeholder="Full Name"
         value={form.name}
         onChange={handleChange}
