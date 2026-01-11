@@ -15,7 +15,7 @@ function App() {
 
   return (
     <Routes>
-      {/* ROOT — decides automatically */}
+      {/* ROOT */}
       <Route
         path="/"
         element={slug ? <PublicStore slug={slug} /> : <Landing />}
@@ -30,8 +30,11 @@ function App() {
       <Route path="/manage/categories" element={<ManageCategories />} />
       <Route path="/manage/items" element={<ManageItems />} />
 
-      {/* FALLBACK */}
-      <Route path="*" element={<Landing />} />
+      {/* FALLBACK — IMPORTANT */}
+      <Route
+        path="*"
+        element={slug ? <PublicStore slug={slug} /> : <Landing />}
+      />
     </Routes>
   );
 }
