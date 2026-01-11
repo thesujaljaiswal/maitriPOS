@@ -1,14 +1,17 @@
 export const getStoreSlug = () => {
   const host = window.location.hostname;
-  // maitripostest.localhost
-
   const parts = host.split(".");
 
-  // localhost → no slug
-  if (parts.length < 2) return null;
+  // localhost (no subdomain)
+  if (host === "localhost") return null;
 
-  // maitripostest.localhost → slug = maitripostest
-  if (parts[parts.length - 1] === "localhost") {
+  // subdomain.localhost
+  if (host.endsWith(".localhost")) {
+    return parts[0];
+  }
+
+  // subdomain.maitripos.com
+  if (parts.length >= 3) {
     return parts[0];
   }
 
