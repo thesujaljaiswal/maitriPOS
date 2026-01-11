@@ -7,10 +7,11 @@ export default function Register() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
-    fullname: "",
+    fullName: "",
     username: "",
     email: "",
     password: "",
+    phone: "",
   });
 
   const [error, setError] = useState("");
@@ -28,24 +29,22 @@ export default function Register() {
     e.preventDefault();
     if (loading) return;
 
-    setError("");
+    const { fullName, username, email, password } = form;
 
-    const { fullname, username, email, password } = form;
-
-    if (!fullname || !username || !email || !password) {
-      setError("All fields are required");
+    if (!fullName || !username || !email || !password) {
+      setError("All required fields must be filled");
       return;
     }
 
     try {
       setLoading(true);
+      setError("");
 
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/register`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify(form),
         }
       );
@@ -57,9 +56,9 @@ export default function Register() {
         return;
       }
 
-      navigate("/", { replace: true });
+      navigate("/login");
     } catch {
-      setError("Network error. Please try again.");
+      setError("Network error. Try again.");
     } finally {
       setLoading(false);
     }
@@ -72,9 +71,9 @@ export default function Register() {
       {error && <div className="error">{error}</div>}
 
       <input
-        name="fullname"
+        name="fullName"
         placeholder="Full Name"
-        value={form.name}
+        value={form.fullName}
         onChange={handleChange}
       />
 
@@ -90,6 +89,13 @@ export default function Register() {
         name="email"
         placeholder="Email"
         value={form.email}
+        onChange={handleChange}
+      />
+
+      <input
+        name="phone"
+        placeholder="Phone (optional)"
+        value={form.phone}
         onChange={handleChange}
       />
 
