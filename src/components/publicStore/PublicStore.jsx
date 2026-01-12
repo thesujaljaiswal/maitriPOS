@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback, memo } from "react";
 import logo from "../../assets/maitriPOS ICON 2.jpg";
 import "./style.css";
+import { Oval } from "react-loader-spinner";
 
 const PublicStore = ({ slug }) => {
   const [storeData, setStoreData] = useState(null);
@@ -95,7 +96,9 @@ const PublicStore = ({ slug }) => {
   if (!storeData) {
     return (
       <div className="ps-status-screen">
-        <div className="ps-spinner"></div>
+        <div className="ps-spinner">
+          <Oval />
+        </div>
       </div>
     );
   }

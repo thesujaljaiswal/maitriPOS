@@ -268,7 +268,14 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 20px;
+
+  /* FIX */
+  max-width: 1200px; /* prevents edge sticking on large screens */
+  margin: 0 auto; /* centers the grid */
+  padding: 0 16px; /* space on left & right for mobile */
+  box-sizing: border-box;
 }
+
 .ps-item-card {
   border: 1.5px solid var(--ps-border);
   border-radius: 18px;
