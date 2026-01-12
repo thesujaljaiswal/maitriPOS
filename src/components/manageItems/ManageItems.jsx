@@ -212,8 +212,11 @@ const ManageItems = () => {
                 </div>
                 <div className="mi-card-content">
                   <span className="mi-card-cat">
-                    {item.category?.name > item.sunCategory?.name ||
-                      "Uncategorized"}
+                    {item.category?.name && item.subCategory?.name
+                      ? `${item.category.name} > ${item.subCategory.name}`
+                      : item.category?.name ||
+                        item.subCategory?.name ||
+                        "Uncategorized"}
                   </span>
                   <h3 className="mi-card-title">{item.name}</h3>
                   <p className="mi-card-price">
