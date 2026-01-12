@@ -212,7 +212,8 @@ const ManageItems = () => {
                 </div>
                 <div className="mi-card-content">
                   <span className="mi-card-cat">
-                    {item.category?.name || "Uncategorized"}
+                    {item.category?.name > item.sunCategory?.name ||
+                      "Uncategorized"}
                   </span>
                   <h3 className="mi-card-title">{item.name}</h3>
                   <p className="mi-card-price">
@@ -450,7 +451,7 @@ const ManageItems = () => {
                       />
                       <span className="mi-slider"></span>
                     </label>
-                    <span>Active & Visible</span>
+                    <span>Is Available</span>
                   </div>
                 </div>
               </div>
