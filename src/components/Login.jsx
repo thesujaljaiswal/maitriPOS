@@ -72,32 +72,34 @@ export default function Login() {
   };
 
   return (
-    <form className="auth-form" onSubmit={handleSubmit}>
-      <h2>Login</h2>
+    <>
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <h2>Login</h2>
 
-      {error && <div className="error">{error}</div>}
+        {error && <div className="error">{error}</div>}
 
-      <input
-        type="text"
-        placeholder="Username or Email"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-      />
+        <input
+          type="text"
+          placeholder="Username or Email"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+        />
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
 
-      <button type="submit" disabled={loading}>
-        {loading ? <Oval height={20} width={20} color="#fff" /> : "Login"}
-      </button>
+        <button type="submit" disabled={loading}>
+          {loading ? <Oval height={20} width={20} color="#fff" /> : "Login"}
+        </button>
 
-      <p className="auth-switch">
-        Don’t have an account? <Link to="/register">Register</Link>
-      </p>
-    </form>
+        <p className="auth-switch">
+          Don’t have an account? <Link to="/register">Register</Link>
+        </p>
+      </form>
+    </>
   );
 }

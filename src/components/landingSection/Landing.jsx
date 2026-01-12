@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import "./style.css";
-import Layout from "../Layout";
 import NavbarLayout from "../navbar/Navbar";
 
 export default function Landing() {

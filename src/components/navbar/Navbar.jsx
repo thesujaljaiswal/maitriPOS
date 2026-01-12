@@ -5,27 +5,33 @@ import icon from "../../assets/maitriPOS FAVICON.png";
 
 export default function NavbarLayout() {
   const navigate = useNavigate();
-
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasStore, setHasStore] = useState(false);
   const [storeSlug, setStoreSlug] = useState("");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  /* ---------------- AUTH + STORE CHECK ---------------- */
+  // Prevent background scroll when mobile menu is open
+  useEffect(() => {
+    document.body.style.overflow = isMobileMenuOpen ? "hidden" : "auto";
+  }, [isMobileMenuOpen]);
 
   const checkStatus = useCallback(async () => {
     try {
       const authRes = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/status`,
-        { credentials: "include" }
+        {
+          credentials: "include",
+        }
       );
-
       const authOk = authRes.ok;
       setIsAuthenticated(authOk);
 
       if (authOk) {
         const storeRes = await fetch(
           `${import.meta.env.VITE_API_BASE_URL}/store/me`,
-          { credentials: "include" }
+          {
+            credentials: "include",
+          }
         );
         const result = await storeRes.json();
 
@@ -34,25 +40,16 @@ export default function NavbarLayout() {
           setStoreSlug(result.data[0].slug);
         } else {
           setHasStore(false);
-          setStoreSlug("");
         }
-      } else {
-        setHasStore(false);
-        setStoreSlug("");
       }
     } catch (err) {
       console.error("Initialization error:", err);
-      setIsAuthenticated(false);
-      setHasStore(false);
-      setStoreSlug("");
     }
   }, []);
 
   useEffect(() => {
     checkStatus();
   }, [checkStatus]);
-
-  /* ---------------- LOGOUT ---------------- */
 
   const handleLogout = async () => {
     try {
@@ -63,45 +60,42 @@ export default function NavbarLayout() {
     } finally {
       setIsAuthenticated(false);
       setHasStore(false);
-      setStoreSlug("");
+      setIsMobileMenuOpen(false);
       navigate("/");
       window.location.reload();
     }
   };
 
-  /* ---------------- SUBDOMAIN REDIRECT ---------------- */
-
   const handleVisitStore = (e) => {
     e.preventDefault();
     if (!storeSlug) return;
-
     const { protocol, host } = window.location;
-    const newUrl = `${protocol}//${storeSlug}.${host}`;
-    window.open(newUrl, "_blank");
+    window.open(`${protocol}//${storeSlug}.${host}`, "_blank");
+    setIsMobileMenuOpen(false);
   };
 
-  /* ---------------- UI ---------------- */
+  const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+  const closeMenu = () => setIsMobileMenuOpen(false);
 
   return (
     <div className="mp-app-wrapper">
       <nav className="mp-navbar-root">
         <div className="mp-navbar-container">
-          <Link to="/" className="mp-navbar-brand">
+          <Link to="/" className="mp-navbar-brand" onClick={closeMenu}>
             <img src={icon} alt="Logo" />
             <span>maitriPOS™</span>
           </Link>
 
-          {/* Desktop Menu */}
+          {/* DESKTOP MENU */}
           <div className="mp-navbar-menu-desktop">
             <NavLink to="/" className="mp-navbar-link">
               Home
             </NavLink>
-
             {isAuthenticated ? (
               <>
-                {hasStore && storeSlug ? (
+                {hasStore ? (
                   <a
-                    href=""
+                    href="#"
                     onClick={handleVisitStore}
                     className="mp-navbar-link mp-visit-link"
                   >
@@ -112,15 +106,12 @@ export default function NavbarLayout() {
                     Setup Store
                   </NavLink>
                 )}
-
                 <NavLink to="/manage/categories" className="mp-navbar-link">
                   Categories
                 </NavLink>
-
                 <NavLink to="/manage/items" className="mp-navbar-link">
                   Items
                 </NavLink>
-
                 <button onClick={handleLogout} className="mp-navbar-btn-logout">
                   Logout
                 </button>
@@ -136,17 +127,71 @@ export default function NavbarLayout() {
               </>
             )}
           </div>
+
+          {/* HAMBURGER BUTTON */}
+          <button
+            className={`mp-navbar-hamburger ${
+              isMobileMenuOpen ? "is-active" : ""
+            }`}
+            onClick={toggleMenu}
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
         </div>
       </nav>
 
+      {/* MOBILE DRAWER */}
+      <div className={`mp-navbar-drawer ${isMobileMenuOpen ? "is-open" : ""}`}>
+        <div className="mp-navbar-drawer-links">
+          <NavLink to="/" onClick={closeMenu}>
+            Home
+          </NavLink>
+          {isAuthenticated ? (
+            <>
+              {hasStore ? (
+                <a href="#" onClick={handleVisitStore}>
+                  Visit Store ↗
+                </a>
+              ) : (
+                <NavLink to="/create/store" onClick={closeMenu}>
+                  Setup Store
+                </NavLink>
+              )}
+              <NavLink to="/manage/categories" onClick={closeMenu}>
+                Categories
+              </NavLink>
+              <NavLink to="/manage/items" onClick={closeMenu}>
+                Items
+              </NavLink>
+              <button
+                className="mp-navbar-drawer-logout"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <NavLink to="/login" onClick={closeMenu}>
+                Login
+              </NavLink>
+              <NavLink
+                to="/register"
+                className="mp-navbar-drawer-cta"
+                onClick={closeMenu}
+              >
+                Join Free
+              </NavLink>
+            </>
+          )}
+        </div>
+      </div>
+
       <main style={{ marginTop: "70px" }}>
         <Outlet
-          context={{
-            hasStore,
-            isAuthenticated,
-            storeSlug,
-            checkStatus,
-          }}
+          context={{ hasStore, isAuthenticated, storeSlug, checkStatus }}
         />
       </main>
     </div>
