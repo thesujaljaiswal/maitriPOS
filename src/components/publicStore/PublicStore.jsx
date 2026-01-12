@@ -143,7 +143,6 @@ const PublicStore = ({ slug }) => {
           </div>
         </div>
       </header>
-
       {/* CATEGORY BAR */}
       <div className="ps-category-bar-sticky">
         <div className="ps-category-scroll">
@@ -160,7 +159,6 @@ const PublicStore = ({ slug }) => {
           ))}
         </div>
       </div>
-
       {/* MAIN */}
       <main className="ps-store-main">
         {categories.map((cat) => (
@@ -216,7 +214,6 @@ const PublicStore = ({ slug }) => {
           </section>
         ))}
       </main>
-
       <footer className="ps-footer">
         <p className="ps-powered-by">
           Powered by{" "}
@@ -225,37 +222,93 @@ const PublicStore = ({ slug }) => {
           </a>
         </p>
       </footer>
-
-      {/* MODAL */}
+      {/* COMPREHENSIVE MODAL */}{" "}
       {selectedItem && (
         <div className="ps-modal-overlay" onClick={() => setSelectedItem(null)}>
+          {" "}
           <div className="ps-modal-card" onClick={(e) => e.stopPropagation()}>
+            {" "}
             <div className="ps-modal-img-container">
+              {" "}
               <img
                 src={selectedItem.image}
                 alt={selectedItem.name}
                 className="ps-modal-img"
-              />
+              />{" "}
               <button
                 className="ps-modal-close-icon"
                 onClick={() => setSelectedItem(null)}
               >
-                ×
-              </button>
-            </div>
-
+                {" "}
+                ×{" "}
+              </button>{" "}
+            </div>{" "}
             <div className="ps-modal-info">
-              <h3 className="ps-modal-title">{selectedItem.name}</h3>
+              {" "}
+              <div className="ps-modal-header">
+                {" "}
+                <h3 className="ps-modal-title">{selectedItem.name}</h3>{" "}
+                <span className="ps-modal-price-main">
+                  {" "}
+                  ₹{" "}
+                  {selectedItem.price ||
+                    (selectedItem.variants?.length > 0
+                      ? Math.min(...selectedItem.variants.map((v) => v.price))
+                      : 0)}{" "}
+                </span>{" "}
+              </div>{" "}
+              {selectedItem.tags?.length > 0 && selectedItem.tags[0] !== "" && (
+                <div className="ps-modal-tags">
+                  {" "}
+                  {selectedItem.tags.map((tag, idx) => (
+                    <span key={idx} className="ps-modal-tag-chip">
+                      {" "}
+                      #{tag}{" "}
+                    </span>
+                  ))}{" "}
+                </div>
+              )}{" "}
+              <div className="ps-modal-body">
+                {" "}
+                <label className="ps-modal-label">Description</label>{" "}
+                <p className="ps-modal-desc">
+                  {" "}
+                  {selectedItem.description ||
+                    "No additional description available."}{" "}
+                </p>{" "}
+                {selectedItem.variants?.length > 0 && (
+                  <div className="ps-modal-variants-section">
+                    {" "}
+                    <label className="ps-modal-label">
+                      Available Options
+                    </label>{" "}
+                    <div className="ps-modal-variant-list">
+                      {" "}
+                      {selectedItem.variants.map((v) => (
+                        <div key={v._id} className="ps-modal-variant-row">
+                          {" "}
+                          <div className="ps-v-info">
+                            {" "}
+                            <span className="ps-v-name">{v.name}</span>{" "}
+                          </div>{" "}
+                          <span className="ps-v-price">₹{v.price}</span>{" "}
+                        </div>
+                      ))}{" "}
+                    </div>{" "}
+                  </div>
+                )}{" "}
+              </div>{" "}
               <button
                 className="ps-modal-close-btn"
                 onClick={() => setSelectedItem(null)}
               >
-                Close
-              </button>
-            </div>
-          </div>
+                {" "}
+                Close{" "}
+              </button>{" "}
+            </div>{" "}
+          </div>{" "}
         </div>
-      )}
+      )}{" "}
     </div>
   );
 };
