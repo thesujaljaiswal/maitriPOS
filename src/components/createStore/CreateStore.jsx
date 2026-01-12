@@ -127,14 +127,14 @@ export default function CreateStore() {
           </div>
 
           <div className="form-group">
-            <label>Store Slug (Unique ID) *</label>
+            <label>Store Slug (eg. mystorename.maitripos.com) *</label>
             <input
               type="text"
               name="slug"
               required
               value={formData.slug}
               onChange={handleChange}
-              placeholder="e.g. mumbai-jewelers"
+              placeholder="e.g. mystorename"
             />
           </div>
 
