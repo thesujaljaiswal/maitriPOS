@@ -524,6 +524,19 @@
   letter-spacing: 1px;
 }
 
+.ps-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ps-status-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 300px;
+}
+
 /* --- RESPONSIVE --- */
 @media (max-width: 600px) {
   .ps-hero-title {
