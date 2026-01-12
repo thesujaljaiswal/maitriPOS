@@ -127,12 +127,12 @@
   margin-bottom: 25px;
 }
 .ps-acc {
-  border: 2px solid #323232;
+  border: 1px solid #323232;
   border-radius: 18px;
   margin-bottom: 20px;
   overflow: hidden;
   background: #fff;
-  box-shadow: 0 4px 0 #323232;
+  box-shadow: 0 2px 0 #323232;
 }
 .ps-acc-head {
   padding: 20px;
