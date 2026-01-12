@@ -10,9 +10,6 @@ const PublicStore = ({ slug }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [openSubCats, setOpenSubCats] = useState({});
   const categoryRefs = useRef({});
-  const faviconRef = useRef(null);
-
-  /* ---------------- FETCH STORE ---------------- */
 
   const fetchStore = useCallback(async () => {
     try {
@@ -20,34 +17,10 @@ const PublicStore = ({ slug }) => {
         `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`
       );
       if (!res.ok) throw new Error("Store not found");
-
       const data = await res.json();
-      const fetchedStore = data.data.store;
-
-      // Update title (non-blocking)
-      if (fetchedStore?.name) {
-        document.title = fetchedStore.name;
-      }
-
-      // Update favicon once
-      if (fetchedStore?.logo) {
-        if (!faviconRef.current) {
-          let link = document.querySelector("link[rel~='icon']");
-          if (!link) {
-            link = document.createElement("link");
-            link.rel = "icon";
-            document.head.appendChild(link);
-          }
-          faviconRef.current = link;
-        }
-        faviconRef.current.href = fetchedStore.logo;
-      }
-
       setStoreData(data.data);
-
-      if (data.data.categories?.length > 0) {
+      if (data.data.categories?.length > 0)
         setActiveCategory(data.data.categories[0]._id);
-      }
 
       const initialSubCats = {};
       data.data.categories.forEach((cat) => {
@@ -56,9 +29,9 @@ const PublicStore = ({ slug }) => {
         });
       });
       setOpenSubCats(initialSubCats);
+      document.title = data.data.store.name;
     } catch {
-      setError("Unable to load store data.");
-      document.title = "Store Not Found";
+      setError("Store not found");
     }
   }, [slug]);
 
@@ -66,147 +39,101 @@ const PublicStore = ({ slug }) => {
     fetchStore();
   }, [fetchStore]);
 
-  /* ---------------- HELPERS ---------------- */
+  const toggleAccordion = (id) =>
+    setOpenSubCats((p) => ({ ...p, [id]: !p[id] }));
 
-  const toggleAccordion = useCallback((id) => {
-    setOpenSubCats((prev) => ({ ...prev, [id]: !prev[id] }));
-  }, []);
-
-  const scrollToCategory = useCallback((id) => {
+  const scrollToCat = (id) => {
     setActiveCategory(id);
     const el = categoryRefs.current[id];
-    if (el) {
-      window.scrollTo({
-        top: el.getBoundingClientRect().top + window.pageYOffset - 100,
-        behavior: "smooth",
-      });
-    }
-  }, []);
+    if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
+  };
 
-  /* ---------------- LOADING / ERROR ---------------- */
-
-  if (error) {
+  if (error)
     return (
-      <div className="ps-status-screen">
-        <h2 className="ps-error-text">{error}</h2>
+      <div className="ps-status">
+        <h2>{error}</h2>
       </div>
     );
-  }
-
-  if (!storeData) {
+  if (!storeData)
     return (
-      <div className="ps-status-screen">
-        <div className="ps-spinner">
-          <Oval />
-        </div>
+      <div className="ps-status">
+        <Oval color="#000" />
       </div>
     );
-  }
 
   const { store, categories } = storeData;
 
-  /* ---------------- UI ---------------- */
-
   return (
-    <div className="ps-store-wrapper">
-      <header className="ps-store-hero">
-        <div className="ps-hero-content">
-          <div className="ps-hero-top">
-            <img src={store.logo || logo} alt="Logo" className="ps-hero-logo" />
-            <div
-              className={`ps-hero-status ${
-                store.isOnline ? "ps-online ps-blink" : "ps-offline"
-              }`}
-            >
-              {store.isOnline ? "● Accepting Orders" : "● Closed"}
-            </div>
+    <div className="ps-wrapper">
+      <header className="ps-hero">
+        <div className="ps-hero-inner">
+          <div className="ps-logo-wrap">
+            <img src={store.logo || logo} alt="Logo" className="ps-logo" />
+            <span className={`ps-badge ${store.isOnline ? "ps-on" : "ps-off"}`}>
+              {store.isOnline ? "Accepting Orders" : "Closed"}
+            </span>
           </div>
-
-          <div className="ps-hero-details">
-            <h1 className="ps-hero-title">{store.name}</h1>
-            <p className="ps-hero-address">📍 {store.address}</p>
-
-            <div className="ps-hero-contact-grid">
-              <a
-                href={`tel:${store.contact.phone}`}
-                className="ps-contact-item"
-              >
-                📞 {store.contact.phone}
-              </a>
-              <a
-                href={`mailto:${store.contact.email}`}
-                className="ps-contact-item"
-              >
-                ✉️ {store.contact.email}
-              </a>
-            </div>
+          <h1 className="ps-title">{store.name}</h1>
+          <p className="ps-addr">{store.address}</p>
+          <div className="ps-links">
+            <a href={`tel:${store.contact.phone}`}>📞 {store.contact.phone}</a>
+            <a href={`mailto:${store.contact.email}`}>✉️ Email Us</a>
           </div>
         </div>
       </header>
-      {/* CATEGORY BAR */}
-      <div className="ps-category-bar-sticky">
-        <div className="ps-category-scroll">
-          {categories.map((cat) => (
+
+      <nav className="ps-nav">
+        <div className="ps-nav-scroll">
+          {categories.map((c) => (
             <button
-              key={cat._id}
-              className={`ps-cat-pill ${
-                activeCategory === cat._id ? "ps-cat-active" : ""
+              key={c._id}
+              className={`ps-pill ${
+                activeCategory === c._id ? "ps-pill-active" : ""
               }`}
-              onClick={() => scrollToCategory(cat._id)}
+              onClick={() => scrollToCat(c._id)}
             >
-              {cat.name}
+              {c.name}
             </button>
           ))}
         </div>
-      </div>
-      {/* MAIN */}
-      <main className="ps-store-main">
+      </nav>
+
+      <main className="ps-main">
         {categories.map((cat) => (
           <section
             key={cat._id}
             ref={(el) => (categoryRefs.current[cat._id] = el)}
-            className="ps-main-cat-section"
+            className="ps-section"
           >
-            <div className="ps-cat-header-group">
-              <h2 className="ps-main-cat-title">{cat.name}</h2>
-              <p className="ps-cat-desc">{cat.description}</p>
-            </div>
-
+            <h2 className="ps-sec-title">{cat.name}</h2>
             {cat.subCategories?.map((sub) => (
               <div
                 key={sub._id}
-                className={`ps-accordion-box ${
-                  openSubCats[sub._id] ? "ps-is-open" : ""
-                }`}
+                className={`ps-acc ${openSubCats[sub._id] ? "ps-open" : ""}`}
               >
                 <div
-                  className="ps-accordion-header"
+                  className="ps-acc-head"
                   onClick={() => toggleAccordion(sub._id)}
                 >
-                  <div className="ps-header-left">
-                    <span className="ps-sub-cat-dot"></span>
-                    <div className="ps-sub-cat-info">
-                      <span className="ps-sub-cat-name">{sub.name}</span>
-                      <span className="ps-sub-cat-desc">{sub.description}</span>
-                    </div>
-                  </div>
-                  <div className="ps-header-right">
-                    <span className="ps-sub-cat-count">
-                      {sub.items?.length} Items
+                  <div>
+                    <span className="ps-acc-name">{sub.name}</span>
+                    <span className="ps-acc-count">
+                      {sub.items?.length} items
                     </span>
-                    <span className="ps-accordion-chevron"></span>
                   </div>
+                  <span className="ps-chevron">↓</span>
                 </div>
-
-                <div className="ps-accordion-content-wrapper">
-                  <div className="ps-product-grid">
-                    {sub.items?.map((item) => (
-                      <ProductCard
-                        key={item._id}
-                        item={item}
-                        onSelect={setSelectedItem}
-                      />
-                    ))}
+                <div className="ps-acc-content">
+                  <div className="ps-acc-inner">
+                    <div className="ps-grid">
+                      {sub.items?.map((item) => (
+                        <ProductCard
+                          key={item._id}
+                          item={item}
+                          onOpen={setSelectedItem}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -214,139 +141,80 @@ const PublicStore = ({ slug }) => {
           </section>
         ))}
       </main>
-      <footer className="ps-footer">
-        <p className="ps-powered-by">
-          Powered by{" "}
-          <a href="https://maitripos.com" target="_blank" rel="noreferrer">
-            maitriPOS.com
-          </a>
-        </p>
-      </footer>
-      {/* COMPREHENSIVE MODAL */}{" "}
+
       {selectedItem && (
         <div className="ps-modal-overlay" onClick={() => setSelectedItem(null)}>
-          {" "}
-          <div className="ps-modal-card" onClick={(e) => e.stopPropagation()}>
-            {" "}
-            <div className="ps-modal-img-container">
-              {" "}
-              <img
-                src={selectedItem.image}
-                alt={selectedItem.name}
-                className="ps-modal-img"
-              />{" "}
-              <button
-                className="ps-modal-close-icon"
-                onClick={() => setSelectedItem(null)}
-              >
-                {" "}
-                ×{" "}
-              </button>{" "}
-            </div>{" "}
-            <div className="ps-modal-info">
-              {" "}
-              <div className="ps-modal-header">
-                {" "}
-                <h3 className="ps-modal-title">{selectedItem.name}</h3>{" "}
-                <span className="ps-modal-price-main">
-                  {" "}
-                  ₹{" "}
-                  {selectedItem.price ||
-                    (selectedItem.variants?.length > 0
-                      ? Math.min(...selectedItem.variants.map((v) => v.price))
-                      : 0)}{" "}
-                </span>{" "}
-              </div>{" "}
-              {selectedItem.tags?.length > 0 && selectedItem.tags[0] !== "" && (
-                <div className="ps-modal-tags">
-                  {" "}
-                  {selectedItem.tags.map((tag, idx) => (
-                    <span key={idx} className="ps-modal-tag-chip">
-                      {" "}
-                      #{tag}{" "}
-                    </span>
-                  ))}{" "}
+          <div className="ps-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ps-modal-grid">
+              <div className="ps-modal-img">
+                <img src={selectedItem.image} alt={selectedItem.name} />
+                <button
+                  className="ps-close-btn"
+                  onClick={() => setSelectedItem(null)}
+                >
+                  &times;
+                </button>
+              </div>
+              <div className="ps-modal-info">
+                <div className="ps-modal-header">
+                  <h3>{selectedItem.name}</h3>
+                  <span className="ps-modal-price">
+                    ₹
+                    {selectedItem.price ||
+                      Math.min(...selectedItem.variants.map((v) => v.price))}
+                  </span>
                 </div>
-              )}{" "}
-              <div className="ps-modal-body">
-                {" "}
-                <label className="ps-modal-label">Description</label>{" "}
                 <p className="ps-modal-desc">
-                  {" "}
-                  {selectedItem.description ||
-                    "No additional description available."}{" "}
-                </p>{" "}
+                  {selectedItem.description || "No description available."}
+                </p>
                 {selectedItem.variants?.length > 0 && (
-                  <div className="ps-modal-variants-section">
-                    {" "}
-                    <label className="ps-modal-label">
-                      Available Options
-                    </label>{" "}
-                    <div className="ps-modal-variant-list">
-                      {" "}
-                      {selectedItem.variants.map((v) => (
-                        <div key={v._id} className="ps-modal-variant-row">
-                          {" "}
-                          <div className="ps-v-info">
-                            {" "}
-                            <span className="ps-v-name">{v.name}</span>{" "}
-                          </div>{" "}
-                          <span className="ps-v-price">₹{v.price}</span>{" "}
-                        </div>
-                      ))}{" "}
-                    </div>{" "}
+                  <div className="ps-var-list">
+                    <label>Available Options</label>
+                    {selectedItem.variants.map((v) => (
+                      <div key={v._id} className="ps-var-row">
+                        <span>{v.name}</span>
+                        <b>₹{v.price}</b>
+                      </div>
+                    ))}
                   </div>
-                )}{" "}
-              </div>{" "}
-              <button
-                className="ps-modal-close-btn"
-                onClick={() => setSelectedItem(null)}
-              >
-                {" "}
-                Close{" "}
-              </button>{" "}
-            </div>{" "}
-          </div>{" "}
+                )}
+                <button
+                  className="ps-done-btn"
+                  onClick={() => setSelectedItem(null)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      )}{" "}
+      )}
     </div>
   );
 };
 
-/* ---------------- MEMOIZED CARD ---------------- */
-
-const ProductCard = memo(({ item, onSelect }) => {
+const ProductCard = memo(({ item, onOpen }) => {
   const price =
     item.price ||
     (item.variants?.length
       ? Math.min(...item.variants.map((v) => v.price))
       : 0);
-
   return (
     <div
-      className={`ps-item-card ${!item.isAvailable ? "ps-item-oos" : ""}`}
-      onClick={() => onSelect(item)}
+      className={`ps-card ${!item.isAvailable ? "ps-oos" : ""}`}
+      onClick={() => onOpen(item)}
     >
-      <div className="ps-item-img-box">
-        <img
-          src={item.image}
-          alt={item.name}
-          className="ps-item-img"
-          loading="lazy"
-        />
-        {!item.isAvailable && (
-          <div className="ps-oos-overlay">Not Available</div>
-        )}
+      <div className="ps-card-img">
+        <img src={item.image} alt={item.name} loading="lazy" />
       </div>
-
-      <div className="ps-item-info">
-        <h4 className="ps-item-title">{item.name}</h4>
-        <div className="ps-item-footer">
-          <p className="ps-item-price">
+      <div className="ps-card-body">
+        <h4>{item.name}</h4>
+        <div className="ps-card-foot">
+          <span className="ps-price">
             ₹{price}
-            {item.variants?.length > 0 && " Onwards"}
-          </p>
-          <div className="ps-add-badge">+</div>
+            {item.variants?.length > 0 ? "+" : ""}
+          </span>
+          <div className="ps-add">+</div>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import "./style.css";
-import Layout from "../Layout";
+import NavbarLayout from "../navbar/Navbar";
 
 const ManageItems = () => {
   const navigate = useNavigate();
@@ -143,7 +143,7 @@ const ManageItems = () => {
 
   return (
     <>
-      <Layout />
+      <NavbarLayout />
       <div className="mi-page">
         <div className="mi-container">
           <header className="mi-header">
