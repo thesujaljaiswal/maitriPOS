@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import "./style.css";
 import Layout from "../Layout";
+import NavbarLayout from "../navbar/Navbar";
 
 export default function Landing() {
   const { isAuthenticated, hasStore, storeSlug } = useOutletContext() || {
@@ -20,7 +21,7 @@ export default function Landing() {
 
   return (
     <div className="lp-container">
-      <Layout />
+      <NavbarLayout />
       {/* HERO */}
       <section className="lp-hero">
         <div className="lp-content">

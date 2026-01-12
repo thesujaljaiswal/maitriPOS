@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback, memo } from "react";
 import logo from "../../assets/maitriPOS ICON 2.jpg";
 import "./style.css";
 
@@ -9,92 +9,107 @@ const PublicStore = ({ slug }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [openSubCats, setOpenSubCats] = useState({});
   const categoryRefs = useRef({});
+  const faviconRef = useRef(null);
 
-  useEffect(() => {
-    const fetchStore = async () => {
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`
-        );
-        if (!res.ok) throw new Error("Store not found");
-        const data = await res.json();
-        const fetchedStore = data.data.store;
+  /* ---------------- FETCH STORE ---------------- */
 
-        // 1. Update Document Title
-        if (fetchedStore?.name) {
-          document.title = fetchedStore.name;
-        }
+  const fetchStore = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`
+      );
+      if (!res.ok) throw new Error("Store not found");
 
-        // 2. Update Favicon with Store Logo
-        if (fetchedStore?.logo) {
+      const data = await res.json();
+      const fetchedStore = data.data.store;
+
+      // Update title (non-blocking)
+      if (fetchedStore?.name) {
+        document.title = fetchedStore.name;
+      }
+
+      // Update favicon once
+      if (fetchedStore?.logo) {
+        if (!faviconRef.current) {
           let link = document.querySelector("link[rel~='icon']");
           if (!link) {
             link = document.createElement("link");
             link.rel = "icon";
-            document.getElementsByTagName("head")[0].appendChild(link);
+            document.head.appendChild(link);
           }
-          link.href = fetchedStore.logo;
+          faviconRef.current = link;
         }
-
-        setStoreData(data.data);
-        if (data.data.categories.length > 0)
-          setActiveCategory(data.data.categories[0]._id);
-
-        const initialSubCats = {};
-        data.data.categories.forEach((cat) => {
-          cat.subCategories?.forEach((sub) => {
-            initialSubCats[sub._id] = true;
-          });
-        });
-        setOpenSubCats(initialSubCats);
-      } catch (err) {
-        setError("Unable to load store data.");
-        document.title = "Store Not Found";
+        faviconRef.current.href = fetchedStore.logo;
       }
-    };
-    fetchStore();
+
+      setStoreData(data.data);
+
+      if (data.data.categories?.length > 0) {
+        setActiveCategory(data.data.categories[0]._id);
+      }
+
+      const initialSubCats = {};
+      data.data.categories.forEach((cat) => {
+        cat.subCategories?.forEach((sub) => {
+          initialSubCats[sub._id] = true;
+        });
+      });
+      setOpenSubCats(initialSubCats);
+    } catch {
+      setError("Unable to load store data.");
+      document.title = "Store Not Found";
+    }
   }, [slug]);
 
-  const toggleAccordion = (id) => {
-    setOpenSubCats((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
+  useEffect(() => {
+    fetchStore();
+  }, [fetchStore]);
 
-  const scrollToCategory = (id) => {
+  /* ---------------- HELPERS ---------------- */
+
+  const toggleAccordion = useCallback((id) => {
+    setOpenSubCats((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
+  const scrollToCategory = useCallback((id) => {
     setActiveCategory(id);
-    const element = categoryRefs.current[id];
-    if (element) {
+    const el = categoryRefs.current[id];
+    if (el) {
       window.scrollTo({
-        top: element.getBoundingClientRect().top + window.pageYOffset - 100,
+        top: el.getBoundingClientRect().top + window.pageYOffset - 100,
         behavior: "smooth",
       });
     }
-  };
+  }, []);
 
-  if (error)
+  /* ---------------- LOADING / ERROR ---------------- */
+
+  if (error) {
     return (
       <div className="ps-status-screen">
         <h2 className="ps-error-text">{error}</h2>
       </div>
     );
-  if (!storeData)
+  }
+
+  if (!storeData) {
     return (
       <div className="ps-status-screen">
         <div className="ps-spinner"></div>
       </div>
     );
+  }
 
   const { store, categories } = storeData;
+
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="ps-store-wrapper">
       <header className="ps-store-hero">
         <div className="ps-hero-content">
           <div className="ps-hero-top">
-            <img
-              src={store.logo ? store.logo : logo}
-              alt="Logo"
-              className="ps-hero-logo"
-            />
+            <img src={store.logo || logo} alt="Logo" className="ps-hero-logo" />
             <div
               className={`ps-hero-status ${
                 store.isOnline ? "ps-online ps-blink" : "ps-offline"
@@ -103,9 +118,11 @@ const PublicStore = ({ slug }) => {
               {store.isOnline ? "● Accepting Orders" : "● Closed"}
             </div>
           </div>
+
           <div className="ps-hero-details">
             <h1 className="ps-hero-title">{store.name}</h1>
             <p className="ps-hero-address">📍 {store.address}</p>
+
             <div className="ps-hero-contact-grid">
               <a
                 href={`tel:${store.contact.phone}`}
@@ -124,6 +141,7 @@ const PublicStore = ({ slug }) => {
         </div>
       </header>
 
+      {/* CATEGORY BAR */}
       <div className="ps-category-bar-sticky">
         <div className="ps-category-scroll">
           {categories.map((cat) => (
@@ -140,6 +158,7 @@ const PublicStore = ({ slug }) => {
         </div>
       </div>
 
+      {/* MAIN */}
       <main className="ps-store-main">
         {categories.map((cat) => (
           <section
@@ -179,16 +198,14 @@ const PublicStore = ({ slug }) => {
                 </div>
 
                 <div className="ps-accordion-content-wrapper">
-                  <div className="ps-accordion-content-inner">
-                    <div className="ps-product-grid">
-                      {sub.items?.map((item) => (
-                        <ProductCard
-                          key={item._id}
-                          item={item}
-                          onSelect={setSelectedItem}
-                        />
-                      ))}
-                    </div>
+                  <div className="ps-product-grid">
+                    {sub.items?.map((item) => (
+                      <ProductCard
+                        key={item._id}
+                        item={item}
+                        onSelect={setSelectedItem}
+                      />
+                    ))}
                   </div>
                 </div>
               </div>
@@ -200,17 +217,13 @@ const PublicStore = ({ slug }) => {
       <footer className="ps-footer">
         <p className="ps-powered-by">
           Powered by{" "}
-          <a
-            href="https://maitripos.com"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a href="https://maitripos.com" target="_blank" rel="noreferrer">
             maitriPOS.com
           </a>
         </p>
       </footer>
 
-      {/* COMPREHENSIVE MODAL */}
+      {/* MODAL */}
       {selectedItem && (
         <div className="ps-modal-overlay" onClick={() => setSelectedItem(null)}>
           <div className="ps-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -229,51 +242,7 @@ const PublicStore = ({ slug }) => {
             </div>
 
             <div className="ps-modal-info">
-              <div className="ps-modal-header">
-                <h3 className="ps-modal-title">{selectedItem.name}</h3>
-                <span className="ps-modal-price-main">
-                  ₹
-                  {selectedItem.price ||
-                    (selectedItem.variants?.length > 0
-                      ? Math.min(...selectedItem.variants.map((v) => v.price))
-                      : 0)}
-                </span>
-              </div>
-
-              {selectedItem.tags?.length > 0 && selectedItem.tags[0] !== "" && (
-                <div className="ps-modal-tags">
-                  {selectedItem.tags.map((tag, idx) => (
-                    <span key={idx} className="ps-modal-tag-chip">
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <div className="ps-modal-body">
-                <label className="ps-modal-label">Description</label>
-                <p className="ps-modal-desc">
-                  {selectedItem.description ||
-                    "No additional description available."}
-                </p>
-
-                {selectedItem.variants?.length > 0 && (
-                  <div className="ps-modal-variants-section">
-                    <label className="ps-modal-label">Available Options</label>
-                    <div className="ps-modal-variant-list">
-                      {selectedItem.variants.map((v) => (
-                        <div key={v._id} className="ps-modal-variant-row">
-                          <div className="ps-v-info">
-                            <span className="ps-v-name">{v.name}</span>
-                          </div>
-                          <span className="ps-v-price">₹{v.price}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
+              <h3 className="ps-modal-title">{selectedItem.name}</h3>
               <button
                 className="ps-modal-close-btn"
                 onClick={() => setSelectedItem(null)}
@@ -288,12 +257,15 @@ const PublicStore = ({ slug }) => {
   );
 };
 
-const ProductCard = ({ item, onSelect }) => {
+/* ---------------- MEMOIZED CARD ---------------- */
+
+const ProductCard = memo(({ item, onSelect }) => {
   const price =
     item.price ||
-    (item.variants?.length > 0
+    (item.variants?.length
       ? Math.min(...item.variants.map((v) => v.price))
       : 0);
+
   return (
     <div
       className={`ps-item-card ${!item.isAvailable ? "ps-item-oos" : ""}`}
@@ -306,8 +278,11 @@ const ProductCard = ({ item, onSelect }) => {
           className="ps-item-img"
           loading="lazy"
         />
-        {!item.isAvailable && <div className="ps-oos-overlay">SOLD OUT</div>}
+        {!item.isAvailable && (
+          <div className="ps-oos-overlay">Not Available</div>
+        )}
       </div>
+
       <div className="ps-item-info">
         <h4 className="ps-item-title">{item.name}</h4>
         <div className="ps-item-footer">
@@ -320,6 +295,6 @@ const ProductCard = ({ item, onSelect }) => {
       </div>
     </div>
   );
-};
+});
 
 export default PublicStore;

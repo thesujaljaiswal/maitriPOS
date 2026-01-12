@@ -1,149 +1,154 @@
-import React, { useState } from "react";
-import { NavLink, Link } from "react-router-dom";
+import React, { useEffect, useState, useCallback } from "react";
+import { NavLink, Link, Outlet, useNavigate } from "react-router-dom";
 import "./style.css";
 import icon from "../../assets/maitriPOS FAVICON.png";
 
-export default function Navbar({
-  isAuthenticated,
-  onLogout,
-  hasStore,
-  storeSlug,
-}) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+export default function NavbarLayout() {
+  const navigate = useNavigate();
 
-  const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
-  const closeMenu = () => setIsMobileMenuOpen(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasStore, setHasStore] = useState(false);
+  const [storeSlug, setStoreSlug] = useState("");
 
-  // Helper to handle subdomain redirection
+  /* ---------------- AUTH + STORE CHECK ---------------- */
+
+  const checkStatus = useCallback(async () => {
+    try {
+      const authRes = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/auth/status`,
+        { credentials: "include" }
+      );
+
+      const authOk = authRes.ok;
+      setIsAuthenticated(authOk);
+
+      if (authOk) {
+        const storeRes = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL}/store/me`,
+          { credentials: "include" }
+        );
+        const result = await storeRes.json();
+
+        if (result.success && result.data?.length > 0) {
+          setHasStore(true);
+          setStoreSlug(result.data[0].slug);
+        } else {
+          setHasStore(false);
+          setStoreSlug("");
+        }
+      } else {
+        setHasStore(false);
+        setStoreSlug("");
+      }
+    } catch (err) {
+      console.error("Initialization error:", err);
+      setIsAuthenticated(false);
+      setHasStore(false);
+      setStoreSlug("");
+    }
+  }, []);
+
+  useEffect(() => {
+    checkStatus();
+  }, [checkStatus]);
+
+  /* ---------------- LOGOUT ---------------- */
+
+  const handleLogout = async () => {
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      setIsAuthenticated(false);
+      setHasStore(false);
+      setStoreSlug("");
+      navigate("/");
+      window.location.reload();
+    }
+  };
+
+  /* ---------------- SUBDOMAIN REDIRECT ---------------- */
+
   const handleVisitStore = (e) => {
     e.preventDefault();
     if (!storeSlug) return;
 
     const { protocol, host } = window.location;
-    // host includes the port (e.g., localhost:5173)
-    // This creates slug.localhost:5173
     const newUrl = `${protocol}//${storeSlug}.${host}`;
-
     window.open(newUrl, "_blank");
-    closeMenu();
   };
 
+  /* ---------------- UI ---------------- */
+
   return (
-    <nav className="mp-navbar-root">
-      <div className="mp-navbar-container">
-        <Link to="/" className="mp-navbar-brand" onClick={closeMenu}>
-          <img src={icon} alt="Logo" />
-          <span>maitriPOS™</span>
-        </Link>
+    <div className="mp-app-wrapper">
+      <nav className="mp-navbar-root">
+        <div className="mp-navbar-container">
+          <Link to="/" className="mp-navbar-brand">
+            <img src={icon} alt="Logo" />
+            <span>maitriPOS™</span>
+          </Link>
 
-        {/* Desktop Menu */}
-        <div className="mp-navbar-menu-desktop">
-          <NavLink to="/" className="mp-navbar-link">
-            Home
-          </NavLink>
-
-          {isAuthenticated ? (
-            <>
-              {hasStore && storeSlug ? (
-                <a
-                  href=""
-                  onClick={handleVisitStore}
-                  className="mp-navbar-link mp-visit-link"
-                >
-                  Visit Store ↗
-                </a>
-              ) : (
-                <NavLink to="/create/store" className="mp-navbar-link">
-                  Setup Store
-                </NavLink>
-              )}
-
-              <NavLink to="/manage/categories" className="mp-navbar-link">
-                Categories
-              </NavLink>
-              <NavLink to="/manage/items" className="mp-navbar-link">
-                Items
-              </NavLink>
-              <button onClick={onLogout} className="mp-navbar-btn-logout">
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <NavLink to="/login" className="mp-navbar-link">
-                Login
-              </NavLink>
-              <NavLink to="/register" className="mp-navbar-btn-primary">
-                Join Free
-              </NavLink>
-            </>
-          )}
-        </div>
-
-        {/* Hamburger */}
-        <button
-          className={`mp-navbar-hamburger ${
-            isMobileMenuOpen ? "is-active" : ""
-          }`}
-          onClick={toggleMenu}
-        >
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
-
-        {/* Mobile Drawer */}
-        <div
-          className={`mp-navbar-drawer ${isMobileMenuOpen ? "is-open" : ""}`}
-        >
-          <div className="mp-navbar-drawer-links">
-            <NavLink to="/" onClick={closeMenu}>
+          {/* Desktop Menu */}
+          <div className="mp-navbar-menu-desktop">
+            <NavLink to="/" className="mp-navbar-link">
               Home
             </NavLink>
+
             {isAuthenticated ? (
               <>
                 {hasStore && storeSlug ? (
-                  <a href="#" onClick={handleVisitStore}>
+                  <a
+                    href=""
+                    onClick={handleVisitStore}
+                    className="mp-navbar-link mp-visit-link"
+                  >
                     Visit Store ↗
                   </a>
                 ) : (
-                  <NavLink to="/create/store" onClick={closeMenu}>
+                  <NavLink to="/create/store" className="mp-navbar-link">
                     Setup Store
                   </NavLink>
                 )}
-                <NavLink to="/manage/categories" onClick={closeMenu}>
+
+                <NavLink to="/manage/categories" className="mp-navbar-link">
                   Categories
                 </NavLink>
-                <NavLink to="/manage/items" onClick={closeMenu}>
+
+                <NavLink to="/manage/items" className="mp-navbar-link">
                   Items
                 </NavLink>
-                <button
-                  className="mp-navbar-drawer-logout"
-                  onClick={() => {
-                    onLogout();
-                    closeMenu();
-                  }}
-                >
+
+                <button onClick={handleLogout} className="mp-navbar-btn-logout">
                   Logout
                 </button>
               </>
             ) : (
               <>
-                <NavLink to="/login" onClick={closeMenu}>
+                <NavLink to="/login" className="mp-navbar-link">
                   Login
                 </NavLink>
-                <NavLink
-                  to="/register"
-                  className="mp-navbar-drawer-cta"
-                  onClick={closeMenu}
-                >
+                <NavLink to="/register" className="mp-navbar-btn-primary">
                   Join Free
                 </NavLink>
               </>
             )}
           </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      <main style={{ marginTop: "70px" }}>
+        <Outlet
+          context={{
+            hasStore,
+            isAuthenticated,
+            storeSlug,
+            checkStatus,
+          }}
+        />
+      </main>
+    </div>
   );
 }
