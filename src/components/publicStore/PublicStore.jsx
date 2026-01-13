@@ -141,6 +141,14 @@ const PublicStore = ({ slug }) => {
           </section>
         ))}
       </main>
+      <footer className="ps-footer">
+        <p className="ps-powered-by">
+          Powered by{" "}
+          <a href="https://maitripos.com" target="_blank" rel="noreferrer">
+            maitriPOS.com
+          </a>
+        </p>
+      </footer>
 
       {selectedItem && (
         <div className="ps-modal-overlay" onClick={() => setSelectedItem(null)}>

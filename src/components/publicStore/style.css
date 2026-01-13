@@ -179,6 +179,25 @@
   gap: 12px;
   padding: 0 20px 20px;
 }
+
+.ps-footer {
+  text-align: center;
+  padding-bottom: 25px;
+  border-top: 1px solid var(--ps-border);
+  background: #fafafa;
+}
+.ps-powered-by {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ps-gray);
+  letter-spacing: 0.5px;
+}
+.ps-powered-by a {
+  color: #000;
+  text-decoration: none;
+  border-bottom: 3px solid #ffd700;
+}
+
 @media (min-width: 600px) {
   .ps-grid {
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
