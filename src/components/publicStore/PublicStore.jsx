@@ -18,19 +18,36 @@ const PublicStore = ({ slug }) => {
       );
       if (!res.ok) throw new Error("Store not found");
       const data = await res.json();
-      setStoreData(data.data);
-      if (data.data.categories?.length > 0)
-        setActiveCategory(data.data.categories[0]._id);
+      const store = data.data;
+
+      setStoreData(store);
+
+      if (store.categories?.length > 0)
+        setActiveCategory(store.categories[0]._id);
 
       const initialSubCats = {};
-      data.data.categories.forEach((cat) => {
+      store.categories.forEach((cat) => {
         cat.subCategories?.forEach((sub) => {
           initialSubCats[sub._id] = true;
         });
       });
       setOpenSubCats(initialSubCats);
-      document.title = data.data.store.name;
-    } catch {
+
+      // Update Page Title
+      document.title = store.store.name;
+
+      // Update Favicon
+      const logoUrl = store.store.logo; // Adjust based on your actual data path
+      if (logoUrl) {
+        let link = document.querySelector("link[rel~='icon']");
+        if (!link) {
+          link = document.createElement("link");
+          link.rel = "icon";
+          document.head.appendChild(link);
+        }
+        link.href = logoUrl;
+      }
+    } catch (err) {
       setError("Store not found");
     }
   }, [slug]);
