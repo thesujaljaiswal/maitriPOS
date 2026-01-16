@@ -227,7 +227,7 @@ export default function ManageStore() {
                 </button>
               </div>
               <div className="ms-slug-preview">
-                <span>Your site will be at: </span>
+                <span>Your site will available be at: </span>
                 <strong
                   className={slugStatus === "available" ? "text-success" : ""}
                 >
