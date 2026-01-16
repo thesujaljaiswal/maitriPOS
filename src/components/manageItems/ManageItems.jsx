@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useNavigate, useOutletContext } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import "./style.css";
 import NavbarLayout from "../navbar/Navbar";
 import { Oval } from "react-loader-spinner";
@@ -101,14 +101,13 @@ const ManageItems = () => {
     setSelectedItemId(null);
   };
 
+  // Immediate image update for Edit Mode only
   const handleImageUpdate = async (file) => {
     if (!isEditMode || !selectedItemId) return;
-
     setActionLoading(true);
     try {
       const data = new FormData();
       data.append("image", file);
-
       const res = await fetch(
         `${
           import.meta.env.VITE_API_BASE_URL
@@ -120,9 +119,8 @@ const ManageItems = () => {
         }
       );
       if (!res.ok) throw new Error("Image update failed");
-      showMsg("Image updated successfully");
-      await fetchItems(storeId); // Refresh the list
-      resetForm();
+      showMsg("Image updated");
+      fetchItems(storeId);
     } catch (err) {
       showMsg(err.message, "error");
     } finally {
@@ -141,24 +139,36 @@ const ManageItems = () => {
       data.append("category", formData.category);
       data.append("subCategory", formData.subCategory);
       data.append("isAvailable", String(formData.isAvailable));
+
+      // CRITICAL FIX: Append the image file here for creation
+      if (imageFile) {
+        data.append("image", imageFile);
+      }
+
       data.append(
         "tags",
         JSON.stringify(formData.tags.split(",").map((t) => t.trim()))
       );
-      if (variants.length > 0)
+
+      if (variants.length > 0) {
         data.append("variants", JSON.stringify(variants));
-      else data.append("price", formData.price);
+      } else {
+        data.append("price", formData.price);
+      }
 
       const url = isEditMode
         ? `${import.meta.env.VITE_API_BASE_URL}/item/update/${selectedItemId}`
         : `${import.meta.env.VITE_API_BASE_URL}/item/${storeId}`;
+
       const res = await fetch(url, {
         method: isEditMode ? "PATCH" : "POST",
         body: data,
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Update Failed");
-      showMsg(isEditMode ? "Updated" : "Created");
+
+      if (!res.ok) throw new Error("Operation Failed");
+
+      showMsg(isEditMode ? "Product Updated" : "Product Created");
       resetForm();
       fetchItems(storeId);
     } catch (err) {
@@ -179,6 +189,7 @@ const ManageItems = () => {
     <>
       <NavbarLayout />
       <div className="mi-page">
+        {msg.text && <div className={`mi-toast ${msg.type}`}>{msg.text}</div>}
         <div className="mi-container">
           <header className="mi-header">
             <div>
@@ -268,12 +279,14 @@ const ManageItems = () => {
                     <input
                       type="file"
                       id="itemImg"
+                      accept="image/*"
                       hidden
                       onChange={(e) => {
                         const file = e.target.files[0];
                         if (file) {
                           setImageFile(file);
                           setImagePreview(URL.createObjectURL(file));
+                          // If editing, we update immediately. If creating, we wait for handleAction.
                           if (isEditMode) {
                             handleImageUpdate(file);
                           }
@@ -283,6 +296,7 @@ const ManageItems = () => {
                     {imagePreview ? (
                       <img
                         src={imagePreview}
+                        alt="Preview"
                         style={{
                           width: "100%",
                           height: "100%",
@@ -290,9 +304,14 @@ const ManageItems = () => {
                         }}
                       />
                     ) : (
-                      <span style={{ fontSize: "12px", color: "#888" }}>
-                        Upload Photo
-                      </span>
+                      <div style={{ textAlign: "center" }}>
+                        <span style={{ fontSize: "24px", color: "#888" }}>
+                          +
+                        </span>
+                        <p style={{ fontSize: "12px", color: "#888" }}>
+                          Upload Photo
+                        </p>
+                      </div>
                     )}
                   </div>
                   <div
@@ -505,7 +524,11 @@ const ManageItems = () => {
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="mi-btn-save">
+                  <button
+                    type="submit"
+                    className="mi-btn-save"
+                    disabled={actionLoading}
+                  >
                     {actionLoading ? "Saving..." : "Save Product"}
                   </button>
                 </div>
