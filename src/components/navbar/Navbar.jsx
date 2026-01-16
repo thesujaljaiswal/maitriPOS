@@ -10,13 +10,22 @@ export default function NavbarLayout() {
   const [hasStore, setHasStore] = useState(false);
   const [storeSlug, setStoreSlug] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const isMounted = useRef(true);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
     isMounted.current = true;
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
       isMounted.current = false;
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -25,7 +34,6 @@ export default function NavbarLayout() {
   }, [isMobileMenuOpen]);
 
   const checkStatus = useCallback(async () => {
-    // Start loading only if it's the initial check
     try {
       const authRes = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/status`,
@@ -33,7 +41,6 @@ export default function NavbarLayout() {
           credentials: "include",
         }
       );
-
       if (!isMounted.current) return;
 
       if (authRes.ok) {
@@ -45,7 +52,6 @@ export default function NavbarLayout() {
           }
         );
         const result = await storeRes.json();
-
         if (isMounted.current && result.success && result.data?.length > 0) {
           setHasStore(true);
           setStoreSlug(result.data[0].slug);
@@ -77,6 +83,7 @@ export default function NavbarLayout() {
       setIsAuthenticated(false);
       setHasStore(false);
       setIsMobileMenuOpen(false);
+      setIsDropdownOpen(false);
       navigate("/login");
       window.location.reload();
     }
@@ -90,10 +97,16 @@ export default function NavbarLayout() {
     setIsMobileMenuOpen(false);
   };
 
-  const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
-  const closeMenu = () => setIsMobileMenuOpen(false);
+  const closeMenu = () => {
+    setIsMobileMenuOpen(false);
+    setIsDropdownOpen(false);
+  };
 
-  // loading state spinner centering
+  const toggleDropdown = (e) => {
+    e.preventDefault();
+    setIsDropdownOpen(!isDropdownOpen);
+  };
+
   if (isLoading) {
     return (
       <div
@@ -118,62 +131,91 @@ export default function NavbarLayout() {
             <span>maitriPOS™</span>
           </Link>
 
-          <div className="mp-navbar-menu-desktop">
-            <NavLink to="/" className="mp-navbar-link">
-              Home
-            </NavLink>
+          {/* Desktop & Mobile Shared Dropdown Context */}
+          <div className="mp-navbar-actions-wrapper" ref={dropdownRef}>
+            <div className="mp-navbar-menu-desktop">
+              <NavLink to="/" className="mp-navbar-link">
+                Home
+              </NavLink>
+              {isAuthenticated ? (
+                <>
+                  <NavLink to="/create/store" className="mp-navbar-link">
+                    {hasStore ? "Manage Store" : "Setup Store"}
+                  </NavLink>
+                  {hasStore && (
+                    <a
+                      href="#"
+                      onClick={handleVisitStore}
+                      className="mp-navbar-link mp-visit-link"
+                    >
+                      Visit Store ↗
+                    </a>
+                  )}
+                  <NavLink to="/manage/categories" className="mp-navbar-link">
+                    Categories
+                  </NavLink>
+                  <NavLink to="/manage/items" className="mp-navbar-link">
+                    Items
+                  </NavLink>
 
-            {isAuthenticated ? (
-              <>
-                <NavLink to="/create/store" className="mp-navbar-link">
-                  {hasStore ? "Manage Store" : "Setup Store"}
-                </NavLink>
-
-                {hasStore && (
-                  <a
-                    href="#"
-                    onClick={handleVisitStore}
-                    className="mp-navbar-link mp-visit-link"
+                  <button
+                    className="mp-user-avatar-btn"
+                    onClick={toggleDropdown}
                   >
-                    Visit Store ↗
-                  </a>
-                )}
+                    <div className="mp-user-icon-circle">👤</div>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <NavLink to="/login" className="mp-navbar-link">
+                    Login
+                  </NavLink>
+                  <NavLink to="/register" className="mp-navbar-btn-primary">
+                    Join Free
+                  </NavLink>
+                </>
+              )}
+            </div>
 
-                <NavLink to="/manage/categories" className="mp-navbar-link">
-                  Categories
-                </NavLink>
-                <NavLink to="/manage/items" className="mp-navbar-link">
-                  Items
-                </NavLink>
-                <button onClick={handleLogout} className="mp-navbar-btn-logout">
+            {/* Mobile Actions (Visible under 850px) */}
+            <div className="mp-mobile-actions">
+              {isAuthenticated && (
+                <button className="mp-user-avatar-btn" onClick={toggleDropdown}>
+                  <div className="mp-user-icon-circle">👤</div>
+                </button>
+              )}
+              <button
+                className={`mp-navbar-hamburger ${
+                  isMobileMenuOpen ? "is-active" : ""
+                }`}
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                <span></span>
+                <span></span>
+                <span></span>
+              </button>
+            </div>
+
+            {/* Shared Dropdown Menu */}
+            {isAuthenticated && isDropdownOpen && (
+              <div className="mp-dropdown-menu">
+                <div className="mp-dropdown-header">Account</div>
+                <Link to="/account" onClick={closeMenu}>
+                  My Profile
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="mp-dropdown-logout-btn"
+                >
                   Logout
                 </button>
-              </>
-            ) : (
-              <>
-                <NavLink to="/login" className="mp-navbar-link">
-                  Login
-                </NavLink>
-                <NavLink to="/register" className="mp-navbar-btn-primary">
-                  Join Free
-                </NavLink>
-              </>
+              </div>
             )}
           </div>
-
-          <button
-            className={`mp-navbar-hamburger ${
-              isMobileMenuOpen ? "is-active" : ""
-            }`}
-            onClick={toggleMenu}
-          >
-            <span></span>
-            <span></span>
-            <span></span>
-          </button>
         </div>
       </nav>
 
+      {/* Mobile Menu Drawer (Side links) */}
       <div className={`mp-navbar-drawer ${isMobileMenuOpen ? "is-open" : ""}`}>
         <div className="mp-navbar-drawer-links">
           <NavLink to="/" onClick={closeMenu}>
@@ -185,7 +227,11 @@ export default function NavbarLayout() {
                 {hasStore ? "Manage Store" : "Setup Store"}
               </NavLink>
               {hasStore && (
-                <a href="#" onClick={handleVisitStore}>
+                <a
+                  href="#"
+                  onClick={handleVisitStore}
+                  className="mp-navbar-link mp-visit-link"
+                >
                   Visit Store ↗
                 </a>
               )}
@@ -195,12 +241,6 @@ export default function NavbarLayout() {
               <NavLink to="/manage/items" onClick={closeMenu}>
                 Items
               </NavLink>
-              <button
-                className="mp-navbar-drawer-logout"
-                onClick={handleLogout}
-              >
-                Logout
-              </button>
             </>
           ) : (
             <>

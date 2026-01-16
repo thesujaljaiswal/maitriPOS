@@ -50,6 +50,14 @@ export default function Landing() {
 
   const closeModal = () => setActiveModal(null);
 
+  const handleVisitStore = (e) => {
+    e.preventDefault();
+    if (!storeSlug) return;
+    const { protocol, host } = window.location;
+    window.open(`${protocol}//${storeSlug}.${host}`, "_blank");
+    setIsMobileMenuOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="lp-loading-full">
@@ -87,7 +95,7 @@ export default function Landing() {
 
                   {hasStore && storeSlug && (
                     <Link
-                      to={`/s/${storeSlug}`}
+                      onClick={handleVisitStore}
                       target="_blank"
                       className="lp-btn-outline"
                     >

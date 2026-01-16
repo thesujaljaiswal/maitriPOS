@@ -9,6 +9,7 @@ import ManageCategories from "./components/manageCategory/ManageCategories.jsx";
 import ManageItems from "./components/manageItems/ManageItems.jsx";
 import PublicStore from "./components/publicStore/PublicStore.jsx";
 import { getStoreSlug } from "./utils/getStoreSlug.js";
+import Account from "./components/manageAccount/Account.jsx";
 
 function App() {
   const slug = getStoreSlug();
@@ -24,6 +25,7 @@ function App() {
       {/* AUTH */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/account" element={<Account />} />
 
       {/* OWNER */}
       <Route path="/create/store" element={<CreateStore />} />
