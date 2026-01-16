@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { NavLink, Link, Outlet, useNavigate } from "react-router-dom";
 import "./style.css";
 import icon from "../../assets/maitriPOS FAVICON.png";
+import { Oval } from "react-loader-spinner";
 
 export default function NavbarLayout() {
   const navigate = useNavigate();
@@ -9,13 +10,22 @@ export default function NavbarLayout() {
   const [hasStore, setHasStore] = useState(false);
   const [storeSlug, setStoreSlug] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const isMounted = useRef(true);
 
-  // Prevent background scroll when mobile menu is open
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     document.body.style.overflow = isMobileMenuOpen ? "hidden" : "auto";
   }, [isMobileMenuOpen]);
 
   const checkStatus = useCallback(async () => {
+    // Start loading only if it's the initial check
     try {
       const authRes = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/status`,
@@ -23,10 +33,11 @@ export default function NavbarLayout() {
           credentials: "include",
         }
       );
-      const authOk = authRes.ok;
-      setIsAuthenticated(authOk);
 
-      if (authOk) {
+      if (!isMounted.current) return;
+
+      if (authRes.ok) {
+        setIsAuthenticated(true);
         const storeRes = await fetch(
           `${import.meta.env.VITE_API_BASE_URL}/store/me`,
           {
@@ -35,15 +46,20 @@ export default function NavbarLayout() {
         );
         const result = await storeRes.json();
 
-        if (result.success && result.data?.length > 0) {
+        if (isMounted.current && result.success && result.data?.length > 0) {
           setHasStore(true);
           setStoreSlug(result.data[0].slug);
-        } else {
+        } else if (isMounted.current) {
           setHasStore(false);
         }
+      } else {
+        if (isMounted.current) setIsAuthenticated(false);
       }
     } catch (err) {
-      console.error("Initialization error:", err);
+      console.error("Auth initialization error:", err);
+      if (isMounted.current) setIsAuthenticated(false);
+    } finally {
+      if (isMounted.current) setIsLoading(false);
     }
   }, []);
 
@@ -61,7 +77,7 @@ export default function NavbarLayout() {
       setIsAuthenticated(false);
       setHasStore(false);
       setIsMobileMenuOpen(false);
-      navigate("/");
+      navigate("/login");
       window.location.reload();
     }
   };
@@ -77,6 +93,22 @@ export default function NavbarLayout() {
   const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const closeMenu = () => setIsMobileMenuOpen(false);
 
+  // loading state spinner centering
+  if (isLoading) {
+    return (
+      <div
+        style={{
+          height: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Oval color="#000" height={40} width={40} />
+      </div>
+    );
+  }
+
   return (
     <div className="mp-app-wrapper">
       <nav className="mp-navbar-root">
@@ -86,14 +118,18 @@ export default function NavbarLayout() {
             <span>maitriPOS™</span>
           </Link>
 
-          {/* DESKTOP MENU */}
           <div className="mp-navbar-menu-desktop">
             <NavLink to="/" className="mp-navbar-link">
               Home
             </NavLink>
+
             {isAuthenticated ? (
               <>
-                {hasStore ? (
+                <NavLink to="/create/store" className="mp-navbar-link">
+                  {hasStore ? "Manage Store" : "Setup Store"}
+                </NavLink>
+
+                {hasStore && (
                   <a
                     href="#"
                     onClick={handleVisitStore}
@@ -101,11 +137,8 @@ export default function NavbarLayout() {
                   >
                     Visit Store ↗
                   </a>
-                ) : (
-                  <NavLink to="/create/store" className="mp-navbar-link">
-                    Setup Store
-                  </NavLink>
                 )}
+
                 <NavLink to="/manage/categories" className="mp-navbar-link">
                   Categories
                 </NavLink>
@@ -128,7 +161,6 @@ export default function NavbarLayout() {
             )}
           </div>
 
-          {/* HAMBURGER BUTTON */}
           <button
             className={`mp-navbar-hamburger ${
               isMobileMenuOpen ? "is-active" : ""
@@ -142,7 +174,6 @@ export default function NavbarLayout() {
         </div>
       </nav>
 
-      {/* MOBILE DRAWER */}
       <div className={`mp-navbar-drawer ${isMobileMenuOpen ? "is-open" : ""}`}>
         <div className="mp-navbar-drawer-links">
           <NavLink to="/" onClick={closeMenu}>
@@ -150,14 +181,13 @@ export default function NavbarLayout() {
           </NavLink>
           {isAuthenticated ? (
             <>
-              {hasStore ? (
+              <NavLink to="/create/store" onClick={closeMenu}>
+                {hasStore ? "Manage Store" : "Setup Store"}
+              </NavLink>
+              {hasStore && (
                 <a href="#" onClick={handleVisitStore}>
                   Visit Store ↗
                 </a>
-              ) : (
-                <NavLink to="/create/store" onClick={closeMenu}>
-                  Setup Store
-                </NavLink>
               )}
               <NavLink to="/manage/categories" onClick={closeMenu}>
                 Categories

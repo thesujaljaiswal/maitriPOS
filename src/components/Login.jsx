@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Oval } from "react-loader-spinner";
 import "./style.css";
+import NavbarLayout from "./navbar/Navbar";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -73,6 +74,7 @@ export default function Login() {
 
   return (
     <>
+      <NavbarLayout />
       <form className="auth-form" onSubmit={handleSubmit}>
         <h2>Login</h2>
 

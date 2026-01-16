@@ -1,13 +1,17 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./style.css";
+import NavbarLayout from "../navbar/Navbar";
+import { Oval } from "react-loader-spinner";
 
-export default function CreateStore() {
+export default function ManageStore() {
   const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [storeId, setStoreId] = useState(null);
+  const [slugStatus, setSlugStatus] = useState(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -16,177 +20,269 @@ export default function CreateStore() {
     email: "",
     address: "",
   });
-  const [logo, setLogo] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
 
-  const checkAuthAndStoreLimit = useCallback(async () => {
+  const fetchStore = useCallback(async () => {
     try {
-      // 1. Check Authentication Status
-      const authRes = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/auth/status`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/store/me`, {
+        credentials: "include",
+      });
+      const result = await res.json();
 
-      if (!authRes.ok) {
-        navigate("/", { replace: true });
-        return;
+      if (res.ok && result.data?.length > 0) {
+        const store = result.data[0];
+        setStoreId(store._id);
+        setIsEditMode(true);
+        setFormData({
+          name: store.name || "",
+          slug: store.slug || "",
+          phone: store.contact?.phone || "",
+          email: store.contact?.email || "",
+          address: store.address || "",
+        });
+        setLogoPreview(store.logo);
+        setSlugStatus("available"); // Existing slug is available to the owner
       }
-
-      // 2. Check if user already has a store (Restriction for v1)
-      const storeRes = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/store/me`,
-        { credentials: "include" }
-      );
-
-      if (storeRes.ok) {
-        const storeData = await storeRes.json();
-        // If data exists, user already has a store
-        if (storeData.data && storeData.data.length > 0) {
-          navigate("/", { replace: true });
-          return;
-        }
-      }
-
-      setIsAuthenticated(true);
     } catch (err) {
-      console.error("Initialization failed:", err);
-      navigate("/", { replace: true });
+      setError("Failed to load store data");
     } finally {
-      setCheckingAuth(false);
+      setLoading(false);
     }
-  }, [navigate]);
+  }, []);
 
   useEffect(() => {
-    checkAuthAndStoreLimit();
-  }, [checkAuthAndStoreLimit]);
+    fetchStore();
+  }, [fetchStore]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleFileChange = (e) => {
-    setLogo(e.target.files[0]);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    const data = new FormData();
-    data.append("name", formData.name);
-    data.append("slug", formData.slug);
-    data.append("phone", formData.phone);
-    data.append("email", formData.email);
-    data.append("address", formData.address);
-    if (logo) data.append("logo", logo);
-
+  const handleCheckSlug = async () => {
+    if (!formData.slug) return;
+    setSlugStatus("checking");
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/store/create`,
+      const query = storeId ? `?currentStoreId=${storeId}` : "";
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/store/check-slug/${
+          formData.slug
+        }${query}`,
+        { credentials: "include" }
+      );
+      const result = await res.json();
+      setSlugStatus(result.data.available ? "available" : "unavailable");
+    } catch (err) {
+      setSlugStatus(null);
+    }
+  };
+
+  const handleLogoUpdate = async (file) => {
+    if (!isEditMode || !storeId) return;
+    setActionLoading(true);
+    try {
+      const data = new FormData();
+      data.append("logo", file);
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/store/${storeId}/logo`,
         {
-          method: "POST",
+          method: "PUT",
           body: data,
           credentials: "include",
         }
       );
-
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.message || "Failed to create store");
-
-      navigate("/dashboard");
+      if (!res.ok) throw new Error("Logo update failed");
+      const result = await res.json();
+      setLogoPreview(result.data.logo);
+      alert("Logo updated!");
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
-  if (checkingAuth || !isAuthenticated) return null;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (slugStatus !== "available") {
+      alert("Please verify slug availability first.");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const payload = {
+        name: formData.name,
+        slug: formData.slug,
+        address: formData.address,
+        contact: { phone: formData.phone, email: formData.email },
+      };
+
+      const url = isEditMode
+        ? `${import.meta.env.VITE_API_BASE_URL}/store/update/${storeId}`
+        : `${import.meta.env.VITE_API_BASE_URL}/store/create`;
+
+      const res = await fetch(url, {
+        method: isEditMode ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Operation failed");
+      alert(isEditMode ? "Store updated" : "Store created");
+      if (!isEditMode) navigate("/dashboard");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  if (loading)
+    return (
+      <div className="ms-loading">
+        <Oval color="#000" />
+      </div>
+    );
 
   return (
-    <div className="store-container">
-      <div className="store-card">
-        <h2>Setup Your Store</h2>
-        <p className="subtitle">Launch your retail business on maitriPOS™</p>
-
-        {error && <div className="error-message">{error}</div>}
-
-        <form onSubmit={handleSubmit} className="store-form">
-          <div className="form-group">
-            <label>Store Name *</label>
-            <input
-              type="text"
-              name="name"
-              required
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="e.g. Mumbai Jewelers"
-            />
+    <>
+      <NavbarLayout />
+      <div className="ms-page">
+        {actionLoading && (
+          <div className="ms-overlay">
+            <Oval color="#000" height={50} width={50} />
           </div>
+        )}
 
-          <div className="form-group">
-            <label>Store Slug (eg. mystorename.maitripos.com) *</label>
-            <input
-              type="text"
-              name="slug"
-              required
-              value={formData.slug}
-              onChange={handleChange}
-              placeholder="e.g. mystorename"
-            />
-          </div>
+        <div className="ms-container">
+          <header className="ms-header">
+            <h1>{isEditMode ? "Store Settings" : "Create Store"}</h1>
+          </header>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Phone Number</label>
+          <form onSubmit={handleSubmit} className="ms-card">
+            <div className="ms-logo-section">
+              <div className="ms-logo-wrapper">
+                <div className="ms-logo-circle">
+                  <input
+                    type="file"
+                    id="storeLogo"
+                    hidden
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        setLogoPreview(URL.createObjectURL(file));
+                        if (isEditMode) handleLogoUpdate(file);
+                      }
+                    }}
+                  />
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo" />
+                  ) : (
+                    <span className="ms-placeholder">No Logo</span>
+                  )}
+                </div>
+
+                {/* Dedicated Update Button */}
+                <button
+                  type="button"
+                  className="ms-btn-logo"
+                  onClick={() => document.getElementById("storeLogo").click()}
+                >
+                  {logoPreview ? "Update Logo" : "Add Logo"}
+                </button>
+              </div>
+            </div>
+
+            <div className="ms-input-group">
+              <label>Store Name</label>
               <input
-                type="text"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="+91..."
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                required
               />
             </div>
-            <div className="form-group">
-              <label>Email Address</label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="store@example.com"
+
+            <div className="ms-input-group">
+              <label>Store Slug</label>
+              <div className="ms-slug-row">
+                <input
+                  value={formData.slug}
+                  onChange={(e) => {
+                    setSlugStatus(null);
+                    setFormData({
+                      ...formData,
+                      slug: e.target.value.toLowerCase().replace(/\s+/g, "-"),
+                    });
+                  }}
+                  placeholder="e.g. jaiswal-dairy"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={handleCheckSlug}
+                  className="ms-btn-check"
+                  disabled={!formData.slug}
+                >
+                  {slugStatus === "checking" ? "..." : "Check"}
+                </button>
+              </div>
+              <div className="ms-slug-preview">
+                <span>Your site will be at: </span>
+                <strong
+                  className={slugStatus === "available" ? "text-success" : ""}
+                >
+                  {formData.slug || "your-store"}.maitripos.com
+                </strong>
+              </div>
+              {slugStatus && (
+                <span className={`ms-slug-msg ${slugStatus}`}>
+                  {slugStatus === "available" ? "✅ Available" : "❌ Taken"}
+                </span>
+              )}
+            </div>
+
+            <div className="ms-grid">
+              <div className="ms-input-group">
+                <label>Phone</label>
+                <input
+                  value={formData.phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                />
+              </div>
+              <div className="ms-input-group">
+                <label>Email</label>
+                <input
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="ms-input-group">
+              <label>Address</label>
+              <textarea
+                value={formData.address}
+                onChange={(e) =>
+                  setFormData({ ...formData, address: e.target.value })
+                }
+                rows="3"
               />
             </div>
-          </div>
 
-          <div className="form-group">
-            <label>Store Address</label>
-            <textarea
-              name="address"
-              rows="3"
-              value={formData.address}
-              onChange={handleChange}
-              placeholder="Full shop address..."
-            ></textarea>
-          </div>
-
-          <div className="form-group">
-            <label>Store Logo</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="file-input"
-            />
-          </div>
-
-          <button type="submit" disabled={loading} className="btn-submit">
-            {loading ? "Creating Store..." : "Create Store"}
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="ms-btn-submit"
+              disabled={slugStatus !== "available"}
+            >
+              {isEditMode ? "Update Settings" : "Launch Store"}
+            </button>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import "./style.css";
 import NavbarLayout from "../navbar/Navbar";
+import { Oval } from "react-loader-spinner";
 
 const ManageItems = () => {
   const navigate = useNavigate();
@@ -100,6 +101,35 @@ const ManageItems = () => {
     setSelectedItemId(null);
   };
 
+  const handleImageUpdate = async (file) => {
+    if (!isEditMode || !selectedItemId) return;
+
+    setActionLoading(true);
+    try {
+      const data = new FormData();
+      data.append("image", file);
+
+      const res = await fetch(
+        `${
+          import.meta.env.VITE_API_BASE_URL
+        }/item/update/${selectedItemId}/image`,
+        {
+          method: "PATCH",
+          body: data,
+          credentials: "include",
+        }
+      );
+      if (!res.ok) throw new Error("Image update failed");
+      showMsg("Image updated successfully");
+      await fetchItems(storeId); // Refresh the list
+      resetForm();
+    } catch (err) {
+      showMsg(err.message, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleAction = async (e) => {
     e.preventDefault();
     setActionLoading(true);
@@ -118,7 +148,6 @@ const ManageItems = () => {
       if (variants.length > 0)
         data.append("variants", JSON.stringify(variants));
       else data.append("price", formData.price);
-      if (imageFile) data.append("image", imageFile);
 
       const url = isEditMode
         ? `${import.meta.env.VITE_API_BASE_URL}/item/update/${selectedItemId}`
@@ -139,7 +168,12 @@ const ManageItems = () => {
     }
   };
 
-  if (loading) return <div className="mi-loader">Loading...</div>;
+  if (loading)
+    return (
+      <div className="ps-status">
+        <Oval color="#000" />
+      </div>
+    );
 
   return (
     <>
@@ -240,6 +274,9 @@ const ManageItems = () => {
                         if (file) {
                           setImageFile(file);
                           setImagePreview(URL.createObjectURL(file));
+                          if (isEditMode) {
+                            handleImageUpdate(file);
+                          }
                         }
                       }}
                     />

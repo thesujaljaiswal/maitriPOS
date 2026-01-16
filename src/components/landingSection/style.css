@@ -352,3 +352,128 @@
   color: #ccc;
   text-align: center;
 }
+
+/* How It Works */
+.lp-how-it-works {
+  padding: 80px 0;
+  background: #fff;
+}
+
+.lp-section-head-center {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.lp-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 40px;
+}
+
+.lp-step {
+  position: relative;
+  padding: 20px;
+}
+
+.lp-step-number {
+  font-size: 40px;
+  font-weight: 800;
+  color: #eee;
+  margin-bottom: 10px;
+}
+
+.lp-step h4 {
+  font-size: 20px;
+  margin-bottom: 10px;
+  color: #000;
+}
+
+.lp-step p {
+  color: #666;
+  line-height: 1.6;
+}
+
+/* Stats Section */
+.lp-stats {
+  padding: 40px 0;
+}
+
+.lp-stats-card {
+  background: #000;
+  border-radius: 24px;
+  padding: 40px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  color: #fff;
+}
+
+.lp-stat-item {
+  text-align: center;
+}
+
+.lp-stat-value {
+  display: block;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.lp-stat-label {
+  font-size: 14px;
+  color: #888;
+}
+
+.lp-stat-divider {
+  width: 1px;
+  height: 40px;
+  background: #333;
+}
+
+/* Bottom CTA */
+.lp-cta-bottom {
+  padding: 100px 0;
+}
+
+.lp-cta-box {
+  background: linear-gradient(135deg, #111 0%, #333 100%);
+  border-radius: 30px;
+  padding: 60px 20px;
+  text-align: center;
+  color: #fff;
+}
+
+.lp-cta-box h2 {
+  font-size: clamp(24px, 5vw, 36px);
+  margin-bottom: 15px;
+}
+
+.lp-cta-box p {
+  margin-bottom: 30px;
+  color: #bbb;
+}
+
+.lp-btn-white {
+  background: #fff;
+  color: #000;
+  padding: 16px 40px;
+  border-radius: 50px;
+  text-decoration: none;
+  font-weight: 700;
+  display: inline-block;
+  transition: transform 0.2s;
+}
+
+.lp-btn-white:hover {
+  transform: scale(1.05);
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+  .lp-stats-card {
+    flex-direction: column;
+    gap: 30px;
+  }
+  .lp-stat-divider {
+    display: none;
+  }
+}

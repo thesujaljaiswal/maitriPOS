@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Oval } from "react-loader-spinner";
 import "./style.css";
+import NavbarLayout from "./navbar/Navbar";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -65,55 +66,58 @@ export default function Register() {
   };
 
   return (
-    <form className="auth-form" onSubmit={handleSubmit}>
-      <h2>Create Account</h2>
+    <>
+      <NavbarLayout />
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <h2>Create Account</h2>
 
-      {error && <div className="error">{error}</div>}
+        {error && <div className="error">{error}</div>}
 
-      <input
-        name="fullName"
-        placeholder="Full Name"
-        value={form.fullName}
-        onChange={handleChange}
-      />
+        <input
+          name="fullName"
+          placeholder="Full Name"
+          value={form.fullName}
+          onChange={handleChange}
+        />
 
-      <input
-        name="username"
-        placeholder="Username"
-        value={form.username}
-        onChange={handleChange}
-      />
+        <input
+          name="username"
+          placeholder="Username"
+          value={form.username}
+          onChange={handleChange}
+        />
 
-      <input
-        type="email"
-        name="email"
-        placeholder="Email"
-        value={form.email}
-        onChange={handleChange}
-      />
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          value={form.email}
+          onChange={handleChange}
+        />
 
-      <input
-        name="phone"
-        placeholder="Phone (optional)"
-        value={form.phone}
-        onChange={handleChange}
-      />
+        <input
+          name="phone"
+          placeholder="Phone (optional)"
+          value={form.phone}
+          onChange={handleChange}
+        />
 
-      <input
-        type="password"
-        name="password"
-        placeholder="Password"
-        value={form.password}
-        onChange={handleChange}
-      />
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          value={form.password}
+          onChange={handleChange}
+        />
 
-      <button type="submit" disabled={loading}>
-        {loading ? <Oval height={20} width={20} color="#fff" /> : "Register"}
-      </button>
+        <button type="submit" disabled={loading}>
+          {loading ? <Oval height={20} width={20} color="#fff" /> : "Register"}
+        </button>
 
-      <p className="auth-switch">
-        Already have an account? <Link to="/login">Login</Link>
-      </p>
-    </form>
+        <p className="auth-switch">
+          Already have an account? <Link to="/login">Login</Link>
+        </p>
+      </form>
+    </>
   );
 }

@@ -1,66 +1,247 @@
-.store-container {
+/* Container & Layout */
+.ms-page {
+  padding: 20px;
+  background-color: #f9f9f9;
+  min-height: 100vh;
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding: 40px 20px;
-  min-height: 80vh;
 }
 
-.store-card {
-  background: #fff;
-  padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+.ms-container {
   width: 100%;
-  max-width: 550px;
+  max-width: 600px;
 }
 
-.form-group {
-  margin-bottom: 15px;
+.ms-header h1 {
+  font-size: clamp(20px, 5vw, 24px); /* Fluid typography */
+  margin-bottom: 20px;
+  color: #111;
+  text-align: center;
+}
+
+/* Card Styling */
+.ms-card {
+  background: #fff;
+  padding: clamp(15px, 5vw, 30px);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eee;
+}
+
+/* Logo Section */
+.ms-logo-section {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.ms-logo-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.ms-logo-circle {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  border: 2px solid #eee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+.ms-logo-circle:hover {
+  border-color: #000;
+}
+
+.ms-logo-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ms-placeholder {
+  font-size: 12px;
+  color: #888;
+}
+
+.ms-btn-logo {
+  padding: 6px 16px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ms-btn-logo:hover {
+  background: #e8e8e8;
+  border-color: #bbb;
+}
+
+/* Form Elements */
+.ms-input-group {
+  margin-bottom: 18px;
   display: flex;
   flex-direction: column;
 }
 
-.form-row {
+.ms-input-group label {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.ms-input-group input,
+.ms-input-group textarea {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  font-size: 16px; /* Prevents iOS auto-zoom on focus */
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.3s;
+}
+
+.ms-input-group input:focus {
+  outline: none;
+  border-color: #000;
+}
+
+/* Slug Specifics */
+.ms-slug-row {
+  display: flex;
+  gap: 10px;
+}
+
+.ms-btn-check {
+  padding: 0 20px;
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ms-slug-msg {
+  font-size: 12px;
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.ms-slug-msg.available {
+  color: #2e7d32;
+}
+.ms-slug-msg.unavailable {
+  color: #d32f2f;
+}
+
+/* Responsive Grid */
+.ms-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 15px;
+  gap: 16px;
 }
 
-.form-group label {
-  font-weight: 600;
-  margin-bottom: 5px;
-  font-size: 0.9rem;
-}
-
-.form-group input,
-.form-group textarea {
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 1rem;
-}
-
-.btn-submit {
+/* Submit Button */
+.ms-btn-submit {
   width: 100%;
-  padding: 12px;
+  padding: 16px;
   background: #000;
-  color: white;
+  color: #fff;
   border: none;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 16px;
   margin-top: 10px;
+  cursor: pointer;
+  transition: opacity 0.3s;
 }
 
-.btn-submit:disabled {
-  background: #666;
+.ms-btn-submit:active {
+  transform: scale(0.98);
 }
 
-.error-message {
-  color: #d32f2f;
-  background: #ffebee;
-  padding: 10px;
-  border-radius: 4px;
-  margin-bottom: 20px;
+.ms-btn-submit:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* Utility */
+.ms-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.ms-slug-preview {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f0f7ff; /* Light blue tint */
+  border-radius: 6px;
+  font-size: 13px;
+  color: #555;
+  border: 1px solid #e0e8f0;
+}
+.ms-slug-preview strong {
+  color: #000;
+  word-break: break-all; /* Ensures long slugs don't break layout on mobile */
+}
+
+.ms-slug-preview .text-success {
+  color: #2e7d32;
+}
+
+/* --- MOBILE RESPONSIVENESS --- */
+
+@media (max-width: 600px) {
+  .ms-logo-circle {
+    width: 90px;
+    height: 90px;
+  }
+
+  .ms-btn-logo {
+    font-size: 11px;
+    padding: 5px 14px;
+  }
+  .ms-page {
+    padding: 10px;
+  }
+
+  .ms-grid {
+    grid-template-columns: 1fr; /* Stack Phone and Email */
+    gap: 0;
+  }
+
+  .ms-card {
+    border-radius: 0; /* Optional: Make it full width on very small screens */
+    box-shadow: none;
+    border: none;
+  }
+  .ms-slug-preview {
+    font-size: 9px;
+    text-align: center;
+  }
+
+  .ms-slug-row {
+    flex-direction: column; /* Stack input and check button */
+  }
+
+  .ms-btn-check {
+    padding: 12px;
+    width: 100%;
+  }
 }
