@@ -84,7 +84,7 @@ export default function NavbarLayout() {
       setHasStore(false);
       setIsMobileMenuOpen(false);
       setIsDropdownOpen(false);
-      navigate("/login");
+      navigate("/");
       window.location.reload();
     }
   };
