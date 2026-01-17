@@ -238,7 +238,7 @@ const ProductCard = memo(({ item, onOpen, storeLogo }) => {
         <div className="ps-card-foot">
           <span className="ps-price">
             ₹{price}
-            {item.variants?.length > 0 ? "+" : ""}
+            {item.variants?.length > 0 ? "onwards" : ""}
           </span>
           <div className="ps-add">+</div>
         </div>
