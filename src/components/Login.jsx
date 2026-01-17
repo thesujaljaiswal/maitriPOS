@@ -19,7 +19,7 @@ export default function Login() {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_BASE_URL}/auth/status`,
-          { credentials: "include" }
+          { credentials: "include" },
         );
 
         if (res.ok) {
@@ -54,7 +54,7 @@ export default function Login() {
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ username, password }),
-        }
+        },
       );
 
       const data = await res.json();
@@ -82,7 +82,7 @@ export default function Login() {
 
         <input
           type="text"
-          placeholder="Username or Email"
+          placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
         />

@@ -63,7 +63,7 @@ export default function ManageStore() {
         `${import.meta.env.VITE_API_BASE_URL}/store/check-slug/${
           formData.slug
         }${query}`,
-        { credentials: "include" }
+        { credentials: "include" },
       );
       const result = await res.json();
       setSlugStatus(result.data.available ? "available" : "unavailable");
@@ -84,7 +84,7 @@ export default function ManageStore() {
           method: "PUT",
           body: data,
           credentials: "include",
-        }
+        },
       );
       if (!res.ok) throw new Error("Logo update failed");
       const result = await res.json();
@@ -246,6 +246,7 @@ export default function ManageStore() {
                 <label>Phone</label>
                 <input
                   value={formData.phone}
+                  required
                   onChange={(e) =>
                     setFormData({ ...formData, phone: e.target.value })
                   }
@@ -255,6 +256,7 @@ export default function ManageStore() {
                 <label>Email</label>
                 <input
                   value={formData.email}
+                  required
                   onChange={(e) =>
                     setFormData({ ...formData, email: e.target.value })
                   }
