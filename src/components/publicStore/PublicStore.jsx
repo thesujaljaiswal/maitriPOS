@@ -14,7 +14,7 @@ const PublicStore = ({ slug }) => {
   const fetchStore = useCallback(async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`
+        `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`,
       );
       if (!res.ok) throw new Error("Store not found");
       const data = await res.json();
@@ -230,7 +230,7 @@ const ProductCard = memo(({ item, onOpen }) => {
       onClick={() => onOpen(item)}
     >
       <div className="ps-card-img">
-        <img src={item.image} alt={item.name} loading="lazy" />
+        <img src={item.image || store.logo} alt={item.name} loading="lazy" />
       </div>
       <div className="ps-card-body">
         <h4>{item.name}</h4>
