@@ -148,6 +148,7 @@ const PublicStore = ({ slug }) => {
                           key={item._id}
                           item={item}
                           onOpen={setSelectedItem}
+                          storeLogo={store.logo}
                         />
                       ))}
                     </div>
@@ -218,7 +219,7 @@ const PublicStore = ({ slug }) => {
   );
 };
 
-const ProductCard = memo(({ item, onOpen }) => {
+const ProductCard = memo(({ item, onOpen, storeLogo }) => {
   const price =
     item.price ||
     (item.variants?.length
@@ -230,7 +231,7 @@ const ProductCard = memo(({ item, onOpen }) => {
       onClick={() => onOpen(item)}
     >
       <div className="ps-card-img">
-        <img src={item.image || store.logo} alt={item.name} loading="lazy" />
+        <img src={item.image || storeLogo} alt={item.name} loading="lazy" />
       </div>
       <div className="ps-card-body">
         <h4>{item.name}</h4>
