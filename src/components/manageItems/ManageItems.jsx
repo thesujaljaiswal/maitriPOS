@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "./style.css";
 import NavbarLayout from "../navbar/Navbar";
 import { Oval } from "react-loader-spinner";
+import fallbackImg from "../../assets/maitriPOS ICON 2.jpg";
 
 const ManageItems = () => {
   const navigate = useNavigate();
@@ -47,7 +48,7 @@ const ManageItems = () => {
   const fetchCategoriesAndSubs = async (id) => {
     const res = await fetch(
       `${import.meta.env.VITE_API_BASE_URL}/categories/${id}`,
-      { credentials: "include" }
+      { credentials: "include" },
     );
     const data = await res.json();
     setCategories(data.data || []);
@@ -116,7 +117,7 @@ const ManageItems = () => {
           method: "PATCH",
           body: data,
           credentials: "include",
-        }
+        },
       );
       if (!res.ok) throw new Error("Image update failed");
       showMsg("Image updated");
@@ -147,7 +148,7 @@ const ManageItems = () => {
 
       data.append(
         "tags",
-        JSON.stringify(formData.tags.split(",").map((t) => t.trim()))
+        JSON.stringify(formData.tags.split(",").map((t) => t.trim())),
       );
 
       if (variants.length > 0) {
@@ -228,7 +229,11 @@ const ManageItems = () => {
                   });
                 }}
               >
-                <img className="mi-card-img" src={item.image} alt={item.name} />
+                <img
+                  className="mi-card-img"
+                  src={item.image || fallbackImg}
+                  alt={item.name}
+                />
                 <div className="mi-card-content">
                   <span className="mi-card-cat">
                     {item.category?.name}{" "}
@@ -481,7 +486,7 @@ const ManageItems = () => {
                             className="mi-btn-v-del"
                             onClick={() =>
                               setVariants(
-                                variants.filter((_, idx) => idx !== i)
+                                variants.filter((_, idx) => idx !== i),
                               )
                             }
                           >
@@ -504,7 +509,7 @@ const ManageItems = () => {
                           `${
                             import.meta.env.VITE_API_BASE_URL
                           }/item/delete/${selectedItemId}`,
-                          { method: "DELETE", credentials: "include" }
+                          { method: "DELETE", credentials: "include" },
                         );
                         resetForm();
                         fetchItems(storeId);
