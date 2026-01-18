@@ -219,7 +219,7 @@ const PublicStore = ({ slug }) => {
   );
 };
 
-const ProductCard = memo(({ item, onOpen, storeLogo }) => {
+const ProductCard = memo(({ item, onOpen, store }) => {
   const price =
     item.price ||
     (item.variants?.length
