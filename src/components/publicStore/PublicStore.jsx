@@ -231,11 +231,7 @@ const ProductCard = memo(({ item, onOpen, store }) => {
       onClick={() => onOpen(item)}
     >
       <div className="ps-card-img">
-        <img
-          src={item.image || store.storeLogo}
-          alt={item.name}
-          loading="lazy"
-        />
+        <img src={item.image || store.logo} alt={item.name} loading="lazy" />
       </div>
       <div className="ps-card-body">
         <h4>{item.name}</h4>
@@ -244,7 +240,7 @@ const ProductCard = memo(({ item, onOpen, store }) => {
             ₹{price}
             {item.variants?.length > 0 ? " onwards" : ""}
           </span>
-          <div className="ps-add">+</div>
+          {/* <div className="ps-add">+</div> */}
         </div>
       </div>
     </div>
