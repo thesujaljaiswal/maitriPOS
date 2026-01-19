@@ -2,17 +2,19 @@ export const getStoreSlug = () => {
   const host = window.location.hostname;
   const parts = host.split(".");
 
-  // localhost (no subdomain)
+  // localhost
   if (host === "localhost") return null;
 
   // subdomain.localhost
   if (host.endsWith(".localhost")) {
-    return parts[0];
+    const sub = parts[0];
+    return sub !== "www" ? sub : null;
   }
 
   // subdomain.maitripos.com
-  if (parts.length >= 3) {
-    return parts[0];
+  if (parts.length > 2) {
+    const sub = parts[0];
+    return sub !== "www" ? sub : null;
   }
 
   return null;
