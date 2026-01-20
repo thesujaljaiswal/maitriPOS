@@ -214,7 +214,7 @@ export default function ManageStore() {
                       slug: e.target.value.toLowerCase().replace(/\s+/g, "-"),
                     });
                   }}
-                  placeholder="e.g. jaiswal-dairy"
+                  placeholder="e.g. your-store"
                   required
                 />
                 <button
