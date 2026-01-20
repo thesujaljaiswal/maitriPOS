@@ -114,7 +114,7 @@ export default function ManageStore() {
       };
 
       const url = isEditMode
-        ? `${import.meta.env.VITE_API_BASE_URL}/store/update/${storeId}`
+        ? `${import.meta.env.VITE_API_BASE_URL}/store/${storeId}`
         : `${import.meta.env.VITE_API_BASE_URL}/store/create`;
 
       const res = await fetch(url, {
