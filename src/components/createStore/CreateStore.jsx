@@ -118,7 +118,7 @@ export default function ManageStore() {
         : `${import.meta.env.VITE_API_BASE_URL}/store/create`;
 
       const res = await fetch(url, {
-        method: isEditMode ? "PATCH" : "POST",
+        method: isEditMode ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
         credentials: "include",
