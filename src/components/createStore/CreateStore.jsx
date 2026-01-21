@@ -126,7 +126,7 @@ export default function ManageStore() {
 
       if (!res.ok) throw new Error("Operation failed");
       alert(isEditMode ? "Store updated" : "Store created");
-      if (!isEditMode) navigate("/dashboard");
+      if (!isEditMode) navigate("/");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -203,7 +203,7 @@ export default function ManageStore() {
             </div>
 
             <div className="ms-input-group">
-              <label>Store Slu(please use text and number and avoid using special characters)g</label>
+              <label>Store Slug (Please use text and number and avoid using special characters)</label>
               <div className="ms-slug-row">
                 <input
                   value={formData.slug}
