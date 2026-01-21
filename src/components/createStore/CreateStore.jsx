@@ -203,7 +203,7 @@ export default function ManageStore() {
             </div>
 
             <div className="ms-input-group">
-              <label>Store Slug</label>
+              <label>Store Slu(please use text and number and avoid using special characters)g</label>
               <div className="ms-slug-row">
                 <input
                   value={formData.slug}
