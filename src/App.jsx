@@ -10,7 +10,7 @@ import ManageItems from "./components/manageItems/ManageItems.jsx";
 import PublicStore from "./components/publicStore/PublicStore.jsx";
 import { getStoreSlug } from "./utils/getStoreSlug.js";
 import Account from "./components/manageAccount/Account.jsx";
-import Upgrade from "./components/upgrade/upgrade.jsx";
+import Upgrade from "./components/upgrade/Upgrade.jsx";
 import OrdersPage from "./components/order/OrdersPage.jsx";
 import OrderDetails from "./components/order/OrderDetails.jsx";
 
