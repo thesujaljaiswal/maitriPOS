@@ -10,6 +10,9 @@ import ManageItems from "./components/manageItems/ManageItems.jsx";
 import PublicStore from "./components/publicStore/PublicStore.jsx";
 import { getStoreSlug } from "./utils/getStoreSlug.js";
 import Account from "./components/manageAccount/Account.jsx";
+import Upgrade from "./components/upgrade/upgrade.jsx";
+import OrdersPage from "./components/order/OrdersPage.jsx";
+import OrderDetails from "./components/order/OrderDetails.jsx";
 
 function App() {
   const slug = getStoreSlug();
@@ -26,11 +29,14 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/account" element={<Account />} />
+      <Route path="/upgrade" element={<Upgrade />} />
 
       {/* OWNER */}
       <Route path="/create/store" element={<CreateStore />} />
       <Route path="/manage/categories" element={<ManageCategories />} />
       <Route path="/manage/items" element={<ManageItems />} />
+      <Route path="/orders" element={<OrdersPage />} />
+      <Route path="/orders/:id" element={<OrderDetails />} />
 
       {/* FALLBACK — IMPORTANT */}
       <Route

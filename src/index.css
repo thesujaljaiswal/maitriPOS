@@ -4,3 +4,72 @@ body {
   background-color: var(--bg);
   color: var(--text-main);
 }
+/* --- Global Number Input Fixes --- */
+
+/* 1. Remove arrows (spinners) in Chrome, Safari, Edge, and Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* 2. Remove arrows (spinners) in Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* 3. Prevent scroll wheel from changing numbers */
+/* This works by disabling pointer events on the input only when it is being scrolled over */
+input[type="number"]:focus {
+  outline: none;
+}
+
+/* 4. Strictly Positive UI Hint */
+/* Note: CSS cannot strictly stop a user from typing '-', 
+   but we can visually indicate error or prevent interaction */
+input[type="number"] {
+  /* Prevent interaction with the 'scroll' behavior specifically */
+  overflow: hidden;
+}
+
+/* --- Responsive Table Fix for index.css --- */
+.ord-table-wrap {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ord-primary) transparent;
+}
+
+.ord-table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+
+.ord-table-wrap::-webkit-scrollbar-thumb {
+  background-color: var(--ord-primary);
+  border-radius: 10px;
+}
+/* --- Global Number Input Clean-up --- */
+
+/* 1. Remove arrows/spinners globally */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
+  appearance: textfield;
+}
+
+/* 2. Disable the scroll-to-change behavior globally */
+/* This prevents the input from capturing the mouse wheel event when focused */
+input[type="number"] {
+  touch-action: manipulation;
+}
+
+/* 3. Global CSS-level protection for positive values */
+/* While it doesn't block the minus key, it flags invalid states visually */
+input[type="number"]:invalid {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2;
+}

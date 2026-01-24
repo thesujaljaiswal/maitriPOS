@@ -5,7 +5,13 @@ import NavbarLayout from "../navbar/Navbar";
 
 export default function Account() {
   const navigate = useNavigate();
-  const [user, setUser] = useState({ fullName: "", email: "", phone: "" });
+  const [user, setUser] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    plan: "",
+    planExpiresAt: "",
+  });
   const [passwordData, setPasswordData] = useState({
     oldPassword: "",
     newPassword: "",
@@ -14,13 +20,26 @@ export default function Account() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
+  // Helper to format the date
+  const formatDate = (dateString) => {
+    if (!dateString || dateString === "FREE PLAN") return "N/A (Free Tier)";
+    const date = new Date(dateString);
+    return isNaN(date.getTime())
+      ? dateString
+      : date.toLocaleDateString("en-US", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+  };
+
   const fetchUserData = async () => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/current-user`,
         {
           credentials: "include",
-        }
+        },
       );
       const result = await res.json();
       if (result.success) {
@@ -28,6 +47,8 @@ export default function Account() {
           fullName: result.data.fullName || "",
           email: result.data.email || "",
           phone: result.data.phone || "",
+          plan: result.data.plan || "",
+          planExpiresAt: result.data.planExpiresAt || "FREE PLAN",
         });
       } else {
         navigate("/login");
@@ -53,7 +74,7 @@ export default function Account() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(user),
           credentials: "include",
-        }
+        },
       );
       const result = await res.json();
       setMessage({
@@ -78,7 +99,7 @@ export default function Account() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(passwordData),
           credentials: "include",
-        }
+        },
       );
       const result = await res.json();
       if (result.success) {
@@ -119,6 +140,16 @@ export default function Account() {
         )}
 
         <div className="mp-account-single-card">
+          <div className="mp-form-group">
+            <label>
+              Current Plan: <b>{user.plan || "N/A"}</b>
+            </label>
+          </div>
+          <div className="mp-form-group">
+            <label>
+              Expires On: <b>{formatDate(user.planExpiresAt)}</b>
+            </label>
+          </div>
           <section className="mp-account-card">
             <h3>Profile Details</h3>
             <form onSubmit={handleUpdateProfile}>
@@ -150,6 +181,7 @@ export default function Account() {
                   onChange={(e) => setUser({ ...user, phone: e.target.value })}
                 />
               </div>
+
               <button type="submit" className="mp-btn-save" disabled={loading}>
                 {loading ? "Saving..." : "Save Changes"}
               </button>
@@ -158,7 +190,6 @@ export default function Account() {
         </div>
       </div>
 
-      {/* Password Modal */}
       {isModalOpen && (
         <div className="mp-modal-overlay">
           <div className="mp-modal-content">

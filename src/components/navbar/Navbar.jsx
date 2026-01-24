@@ -12,13 +12,16 @@ export default function NavbarLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [plan, setPlan] = useState("ARAMBH");
+  const [planExpiresAt, setPlanExpiresAt] = useState(null);
+
   const isMounted = useRef(true);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
     isMounted.current = true;
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setIsDropdownOpen(false);
       }
     };
@@ -37,33 +40,26 @@ export default function NavbarLayout() {
     try {
       const authRes = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/status`,
-        {
-          credentials: "include",
-        }
+        { credentials: "include" },
       );
       if (!isMounted.current) return;
-
       if (authRes.ok) {
+        const authData = await authRes.json();
         setIsAuthenticated(true);
+        setPlan(authData.data.plan);
+        setPlanExpiresAt(authData.data.planExpiresAt);
         const storeRes = await fetch(
           `${import.meta.env.VITE_API_BASE_URL}/store/me`,
-          {
-            credentials: "include",
-          }
+          { credentials: "include" },
         );
         const result = await storeRes.json();
-        if (isMounted.current && result.success && result.data?.length > 0) {
+        if (result.success && result.data?.length > 0) {
           setHasStore(true);
           setStoreSlug(result.data[0].slug);
-        } else if (isMounted.current) {
-          setHasStore(false);
         }
-      } else {
-        if (isMounted.current) setIsAuthenticated(false);
       }
     } catch (err) {
-      console.error("Auth initialization error:", err);
-      if (isMounted.current) setIsAuthenticated(false);
+      console.error(err);
     } finally {
       if (isMounted.current) setIsLoading(false);
     }
@@ -74,19 +70,12 @@ export default function NavbarLayout() {
   }, [checkStatus]);
 
   const handleLogout = async () => {
-    try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } finally {
-      setIsAuthenticated(false);
-      setHasStore(false);
-      setIsMobileMenuOpen(false);
-      setIsDropdownOpen(false);
-      navigate("/");
-      window.location.reload();
-    }
+    await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+    navigate("/");
+    window.location.reload();
   };
 
   const handleVisitStore = (e) => {
@@ -94,7 +83,7 @@ export default function NavbarLayout() {
     if (!storeSlug) return;
     const { protocol, host } = window.location;
     window.open(`${protocol}//${storeSlug}.${host}`, "_blank");
-    setIsMobileMenuOpen(false);
+    closeMenu();
   };
 
   const closeMenu = () => {
@@ -102,25 +91,19 @@ export default function NavbarLayout() {
     setIsDropdownOpen(false);
   };
 
-  const toggleDropdown = (e) => {
-    e.preventDefault();
-    setIsDropdownOpen(!isDropdownOpen);
+  const shouldShowUpgrade = () => {
+    if (plan === "ARAMBH") return true;
+    if (!planExpiresAt) return false;
+    const diff = (new Date(planExpiresAt) - new Date()) / (1000 * 60 * 60 * 24);
+    return diff <= 7;
   };
 
-  if (isLoading) {
+  if (isLoading)
     return (
-      <div
-        style={{
-          height: "100vh",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
+      <div className="loader-box">
         <Oval color="#000" height={40} width={40} />
       </div>
     );
-  }
 
   return (
     <div className="mp-app-wrapper">
@@ -131,16 +114,30 @@ export default function NavbarLayout() {
             <span>maitriPOS™</span>
           </Link>
 
-          {/* Desktop & Mobile Shared Dropdown Context */}
-          <div className="mp-navbar-actions-wrapper" ref={dropdownRef}>
-            <div className="mp-navbar-menu-desktop">
-              <NavLink to="/" className="mp-navbar-link">
+          <div className="mp-nav-right-section">
+            <div
+              className={`mp-navbar-links-wrapper ${isMobileMenuOpen ? "active" : ""}`}
+            >
+              <NavLink to="/" className="mp-navbar-link" onClick={closeMenu}>
                 Home
               </NavLink>
               {isAuthenticated ? (
                 <>
-                  <NavLink to="/create/store" className="mp-navbar-link">
-                    {hasStore ? "Manage Store" : "Setup Store"}
+                  {(plan === "PRAVAH" || plan === "UTSAH") && (
+                    <NavLink
+                      to="/orders"
+                      className="mp-navbar-link"
+                      onClick={closeMenu}
+                    >
+                      Manage Orders
+                    </NavLink>
+                  )}
+                  <NavLink
+                    to="/create/store"
+                    className="mp-navbar-link"
+                    onClick={closeMenu}
+                  >
+                    {hasStore ? "Store Settings" : "Setup Store"}
                   </NavLink>
                   {hasStore && (
                     <a
@@ -151,114 +148,86 @@ export default function NavbarLayout() {
                       Visit Store ↗
                     </a>
                   )}
-                  <NavLink to="/manage/categories" className="mp-navbar-link">
+                  <NavLink
+                    to="/manage/categories"
+                    className="mp-navbar-link"
+                    onClick={closeMenu}
+                  >
                     Categories
                   </NavLink>
-                  <NavLink to="/manage/items" className="mp-navbar-link">
+                  <NavLink
+                    to="/manage/items"
+                    className="mp-navbar-link"
+                    onClick={closeMenu}
+                  >
                     Items
                   </NavLink>
-
-                  <button
-                    className="mp-user-avatar-btn"
-                    onClick={toggleDropdown}
-                  >
-                    <div className="mp-user-icon-circle">👤</div>
-                  </button>
                 </>
               ) : (
                 <>
-                  <NavLink to="/login" className="mp-navbar-link">
+                  <NavLink
+                    to="/login"
+                    className="mp-navbar-link"
+                    onClick={closeMenu}
+                  >
                     Login
                   </NavLink>
-                  <NavLink to="/register" className="mp-navbar-btn-primary">
+                  <NavLink
+                    to="/register"
+                    className="mp-navbar-btn-primary"
+                    onClick={closeMenu}
+                  >
                     Join Free
                   </NavLink>
                 </>
               )}
             </div>
 
-            {/* Mobile Actions (Visible under 850px) */}
-            <div className="mp-mobile-actions">
+            <div className="mp-navbar-icons-group" ref={dropdownRef}>
               {isAuthenticated && (
-                <button className="mp-user-avatar-btn" onClick={toggleDropdown}>
-                  <div className="mp-user-icon-circle">👤</div>
-                </button>
+                <div className="mp-dropdown-container">
+                  <button
+                    className="mp-user-avatar-btn"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  >
+                    <div className="mp-user-icon-circle">👤</div>
+                  </button>
+                  {isDropdownOpen && (
+                    <div className="mp-dropdown-menu">
+                      {shouldShowUpgrade() && (
+                        <button
+                          className="mp-dropdown-upgrade-btn"
+                          onClick={() => {
+                            navigate("/upgrade");
+                            closeMenu();
+                          }}
+                        >
+                          🚀 {plan === "ARAMBH" ? "Upgrade Plan" : "Renew Plan"}
+                        </button>
+                      )}
+                      <Link to="/account" onClick={closeMenu}>
+                        My Profile
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="mp-dropdown-logout-btn"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
               <button
-                className={`mp-navbar-hamburger ${
-                  isMobileMenuOpen ? "is-active" : ""
-                }`}
+                className="mp-hamburger-btn"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               >
-                <span></span>
-                <span></span>
-                <span></span>
+                {isMobileMenuOpen ? "✕" : "☰"}
               </button>
             </div>
-
-            {/* Shared Dropdown Menu */}
-            {isAuthenticated && isDropdownOpen && (
-              <div className="mp-dropdown-menu">
-                <div className="mp-dropdown-header">Account</div>
-                <Link to="/account" onClick={closeMenu}>
-                  My Profile
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="mp-dropdown-logout-btn"
-                >
-                  Logout
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </nav>
-
-      {/* Mobile Menu Drawer (Side links) */}
-      <div className={`mp-navbar-drawer ${isMobileMenuOpen ? "is-open" : ""}`}>
-        <div className="mp-navbar-drawer-links">
-          <NavLink to="/" onClick={closeMenu}>
-            Home
-          </NavLink>
-          {isAuthenticated ? (
-            <>
-              <NavLink to="/create/store" onClick={closeMenu}>
-                {hasStore ? "Manage Store" : "Setup Store"}
-              </NavLink>
-              {hasStore && (
-                <a
-                  href="#"
-                  onClick={handleVisitStore}
-                  className="mp-navbar-link mp-visit-link"
-                >
-                  Visit Store ↗
-                </a>
-              )}
-              <NavLink to="/manage/categories" onClick={closeMenu}>
-                Categories
-              </NavLink>
-              <NavLink to="/manage/items" onClick={closeMenu}>
-                Items
-              </NavLink>
-            </>
-          ) : (
-            <>
-              <NavLink to="/login" onClick={closeMenu}>
-                Login
-              </NavLink>
-              <NavLink
-                to="/register"
-                className="mp-navbar-drawer-cta"
-                onClick={closeMenu}
-              >
-                Join Free
-              </NavLink>
-            </>
-          )}
-        </div>
-      </div>
-
       <main style={{ marginTop: "70px" }}>
         <Outlet
           context={{ hasStore, isAuthenticated, storeSlug, checkStatus }}

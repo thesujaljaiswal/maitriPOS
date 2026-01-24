@@ -18,7 +18,7 @@ export default function Landing() {
         `${import.meta.env.VITE_API_BASE_URL}/auth/status`,
         {
           credentials: "include",
-        }
+        },
       );
 
       if (authRes.ok) {
@@ -27,7 +27,7 @@ export default function Landing() {
           `${import.meta.env.VITE_API_BASE_URL}/store/me`,
           {
             credentials: "include",
-          }
+          },
         );
         const result = await storeRes.json();
 
@@ -75,7 +75,7 @@ export default function Landing() {
           <div className="lp-content">
             <div className="lp-badge">
               <span className="lp-dot"></span>
-              Version 1.0: Catalog Revolution
+              Version 2.0: Ordering Revolution Live now
             </div>
             <h1 className="lp-title">
               Your Digital Catalog <br />
