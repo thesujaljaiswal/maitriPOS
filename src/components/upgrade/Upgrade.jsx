@@ -6,21 +6,55 @@ export default function Upgrade() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
+  const hasRedirectedRef = React.useRef(false);
 
-  // 🔹 Fetch logged-in user info
   useEffect(() => {
     const fetchUser = async () => {
+      if (hasRedirectedRef.current) return;
+
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/status`,
         { credentials: "include" },
       );
 
       const data = await res.json();
-      setUser(data.data);
+      const userData = data.data;
+
+      if (!userData) {
+        hasRedirectedRef.current = true;
+        alert("Please log in to continue.");
+        navigate("/account", { replace: true });
+        return;
+      }
+
+      const plan = userData.plan;
+      const planExpiresAt = userData.planExpiresAt;
+
+      let allow = false;
+
+      if (plan === "ARAMBH") allow = true;
+
+      if (plan === "PRAVAH" && planExpiresAt) {
+        const remainingDays =
+          (new Date(planExpiresAt) - new Date()) / (1000 * 60 * 60 * 24);
+
+        if (remainingDays <= 7) allow = true;
+      }
+
+      if (!allow) {
+        hasRedirectedRef.current = true;
+        alert(
+          "Your current plan is already active. You can upgrade or renew only when your plan is close to expiry (within 7 days).",
+        );
+        navigate("/account", { replace: true });
+        return;
+      }
+
+      setUser(userData);
     };
 
     fetchUser();
-  }, []);
+  }, [navigate]);
 
   // 🔹 Load Razorpay script
   const loadRazorpay = () => {
