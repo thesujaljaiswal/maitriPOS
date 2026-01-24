@@ -32,7 +32,7 @@ export default function OrdersPage() {
   };
 
   const fetchOrders = async (sid) => {
-    const res = await fetch(`${api}/order/${sid}`, {
+    const res = await fetch(`${api}/order/store/${sid}`, {
       credentials: "include",
     });
     const data = await res.json();
