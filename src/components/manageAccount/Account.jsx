@@ -7,6 +7,7 @@ export default function Account() {
   const navigate = useNavigate();
   const [user, setUser] = useState({
     fullName: "",
+    username: "",
     email: "",
     phone: "",
     plan: "",
@@ -45,6 +46,7 @@ export default function Account() {
       if (result.success) {
         setUser({
           fullName: result.data.fullName || "",
+          username: result.data.username || "",
           email: result.data.email || "",
           phone: result.data.phone || "",
           plan: result.data.plan || "",
@@ -160,6 +162,18 @@ export default function Account() {
                   value={user.fullName}
                   onChange={(e) =>
                     setUser({ ...user, fullName: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="mp-form-group">
+                <label>Username</label>
+                <input
+                  disabled
+                  type="text"
+                  value={user.username}
+                  onChange={(e) =>
+                    setUser({ ...user, username: e.target.value })
                   }
                   required
                 />

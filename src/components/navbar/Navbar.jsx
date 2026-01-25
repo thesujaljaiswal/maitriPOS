@@ -1,3 +1,4 @@
+// NavbarLayout.jsx
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { NavLink, Link, Outlet, useNavigate } from "react-router-dom";
 import "./style.css";
@@ -6,25 +7,42 @@ import { Oval } from "react-loader-spinner";
 
 export default function NavbarLayout() {
   const navigate = useNavigate();
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasStore, setHasStore] = useState(false);
   const [storeSlug, setStoreSlug] = useState("");
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
   const [plan, setPlan] = useState("ARAMBH");
   const [planExpiresAt, setPlanExpiresAt] = useState(null);
+
+  const [isProductOpen, setIsProductOpen] = useState(false);
+  const [isBusinessOpen, setIsBusinessOpen] = useState(false);
 
   const isMounted = useRef(true);
   const dropdownRef = useRef(null);
 
+  // ✅ reactive mobile detection (fixes the "window.innerWidth" bug)
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 992);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 992);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // ✅ close dropdown on outside click
   useEffect(() => {
     isMounted.current = true;
+
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setIsDropdownOpen(false);
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       isMounted.current = false;
@@ -32,34 +50,70 @@ export default function NavbarLayout() {
     };
   }, []);
 
+  // ✅ lock scroll only on mobile menu
   useEffect(() => {
     document.body.style.overflow = isMobileMenuOpen ? "hidden" : "auto";
   }, [isMobileMenuOpen]);
 
+  // ✅ close menus when route changes by clicking links
+  const closeMenu = useCallback(() => {
+    setIsMobileMenuOpen(false);
+    setIsDropdownOpen(false);
+    setIsProductOpen(false);
+    setIsBusinessOpen(false);
+  }, []);
+
+  // ✅ when switching to desktop, force-close mobile overlay + dropdowns
+  useEffect(() => {
+    if (!isMobile) closeMenu();
+  }, [isMobile, closeMenu]);
+
   const checkStatus = useCallback(async () => {
     try {
+      setIsLoading(true);
+
       const authRes = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/status`,
         { credentials: "include" },
       );
+
       if (!isMounted.current) return;
-      if (authRes.ok) {
-        const authData = await authRes.json();
-        setIsAuthenticated(true);
-        setPlan(authData.data.plan);
-        setPlanExpiresAt(authData.data.planExpiresAt);
-        const storeRes = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/store/me`,
-          { credentials: "include" },
-        );
-        const result = await storeRes.json();
-        if (result.success && result.data?.length > 0) {
-          setHasStore(true);
-          setStoreSlug(result.data[0].slug);
-        }
+
+      if (!authRes.ok) {
+        setIsAuthenticated(false);
+        setHasStore(false);
+        setStoreSlug("");
+        return;
+      }
+
+      const authData = await authRes.json();
+      setIsAuthenticated(true);
+      setPlan(authData?.data?.plan || "ARAMBH");
+      setPlanExpiresAt(authData?.data?.planExpiresAt || null);
+
+      const storeRes = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/store/me`,
+        { credentials: "include" },
+      );
+
+      const result = await storeRes.json();
+
+      if (
+        result?.success &&
+        Array.isArray(result?.data) &&
+        result.data.length > 0
+      ) {
+        setHasStore(true);
+        setStoreSlug(result.data[0]?.slug || "");
+      } else {
+        setHasStore(false);
+        setStoreSlug("");
       }
     } catch (err) {
       console.error(err);
+      setIsAuthenticated(false);
+      setHasStore(false);
+      setStoreSlug("");
     } finally {
       if (isMounted.current) setIsLoading(false);
     }
@@ -70,33 +124,44 @@ export default function NavbarLayout() {
   }, [checkStatus]);
 
   const handleLogout = async () => {
-    await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-    });
-    navigate("/");
-    window.location.reload();
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      closeMenu();
+      navigate("/");
+      window.location.reload();
+    }
   };
 
-  const handleVisitStore = (e) => {
-    e.preventDefault();
-    if (!storeSlug) return;
-    const { protocol, host } = window.location;
-    window.open(`${protocol}//${storeSlug}.${host}`, "_blank");
-    closeMenu();
+  // ✅ dropdown hover for desktop, click for mobile
+  const onProductEnter = () => {
+    if (!isMobile) setIsProductOpen(true);
+  };
+  const onProductLeave = () => {
+    if (!isMobile) setIsProductOpen(false);
+  };
+  const onBusinessEnter = () => {
+    if (!isMobile) setIsBusinessOpen(true);
+  };
+  const onBusinessLeave = () => {
+    if (!isMobile) setIsBusinessOpen(false);
   };
 
-  const closeMenu = () => {
-    setIsMobileMenuOpen(false);
-    setIsDropdownOpen(false);
+  const toggleProduct = () => {
+    if (isMobile) setIsProductOpen((p) => !p);
+  };
+  const toggleBusiness = () => {
+    if (isMobile) setIsBusinessOpen((p) => !p);
   };
 
-  const shouldShowUpgrade = () => {
-    if (plan === "ARAMBH") return true;
-    if (!planExpiresAt) return false;
-    const diff = (new Date(planExpiresAt) - new Date()) / (1000 * 60 * 60 * 24);
-    return diff <= 7;
-  };
+  // ✅ use NavLink className fn for active style
+  const navClass = ({ isActive }) =>
+    `mp-navbar-link ${isActive ? "mp-navbar-link--active" : ""}`;
 
   if (isLoading)
     return (
@@ -115,66 +180,135 @@ export default function NavbarLayout() {
           </Link>
 
           <div className="mp-nav-right-section">
+            {/* Overlay (only when menu open on mobile) */}
+            <div
+              className={`mp-mobile-overlay ${isMobileMenuOpen ? "show" : ""}`}
+              onClick={closeMenu}
+            />
+
+            {/* Links */}
             <div
               className={`mp-navbar-links-wrapper ${isMobileMenuOpen ? "active" : ""}`}
             >
-              <NavLink to="/" className="mp-navbar-link" onClick={closeMenu}>
+              <NavLink to="/" className={navClass} onClick={closeMenu}>
                 Home
               </NavLink>
+
               {isAuthenticated ? (
                 <>
-                  {(plan === "PRAVAH" || plan === "UTSAH") && (
-                    <NavLink
-                      to="/orders"
-                      className="mp-navbar-link"
-                      onClick={closeMenu}
-                    >
-                      Manage Orders
-                    </NavLink>
-                  )}
                   <NavLink
                     to="/create/store"
-                    className="mp-navbar-link"
+                    className={navClass}
                     onClick={closeMenu}
                   >
                     {hasStore ? "Store Settings" : "Setup Store"}
                   </NavLink>
-                  {hasStore && (
+
+                  {/* Optional quick link to public store */}
+                  {hasStore && storeSlug ? (
                     <a
-                      href="#"
-                      onClick={handleVisitStore}
-                      className="mp-navbar-link mp-visit-link"
+                      className="mp-navbar-link mp-visit-store"
+                      href={`https://${storeSlug}.maitripos.com`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={closeMenu}
                     >
-                      Visit Store ↗
+                      Open Store ↗
                     </a>
+                  ) : null}
+                  <div
+                    className="mp-nav-dropdown"
+                    onMouseEnter={onProductEnter}
+                    onMouseLeave={onProductLeave}
+                  >
+                    <button
+                      type="button"
+                      className="mp-navbar-link mp-dropdown-trigger"
+                      onClick={toggleProduct}
+                    >
+                      Product <small>▾</small>
+                    </button>
+
+                    <div
+                      className={`mp-nav-dropdown-content ${
+                        isProductOpen ? "show" : ""
+                      }`}
+                    >
+                      <Link to="/manage/categories" onClick={closeMenu}>
+                        Categories
+                      </Link>
+                      <Link to="/manage/items" onClick={closeMenu}>
+                        Items
+                      </Link>
+                    </div>
+                  </div>
+                  {(plan === "PRAVAH" || plan === "UTSAH") && (
+                    <div
+                      className="mp-nav-dropdown"
+                      onMouseEnter={onBusinessEnter}
+                      onMouseLeave={onBusinessLeave}
+                    >
+                      <button
+                        type="button"
+                        className="mp-navbar-link mp-dropdown-trigger"
+                        onClick={toggleBusiness}
+                      >
+                        Business <small>▾</small>
+                      </button>
+
+                      <div
+                        className={`mp-nav-dropdown-content ${
+                          isBusinessOpen ? "show" : ""
+                        }`}
+                      >
+                        {(plan === "PRAVAH" || plan === "UTSAH") && (
+                          <Link to="/orders" onClick={closeMenu}>
+                            Manage Orders
+                          </Link>
+                        )}
+                        {(plan === "PRAVAH" || plan === "UTSAH") && (
+                          <Link to="/analytics" onClick={closeMenu}>
+                            Analytics
+                          </Link>
+                        )}
+                      </div>
+                    </div>
                   )}
-                  <NavLink
-                    to="/manage/categories"
-                    className="mp-navbar-link"
-                    onClick={closeMenu}
-                  >
-                    Categories
-                  </NavLink>
-                  <NavLink
-                    to="/manage/items"
-                    className="mp-navbar-link"
-                    onClick={closeMenu}
-                  >
-                    Items
-                  </NavLink>
+
+                  {/* Mobile profile + logout inside menu */}
+                  {isMobile ? (
+                    <>
+                      <NavLink
+                        to="/account"
+                        className={navClass}
+                        onClick={closeMenu}
+                      >
+                        My Profile
+                      </NavLink>
+
+                      <button
+                        type="button"
+                        className="mp-navbar-link mp-logout-link"
+                        onClick={handleLogout}
+                      >
+                        Logout
+                      </button>
+                    </>
+                  ) : null}
                 </>
               ) : (
                 <>
-                  <NavLink
-                    to="/login"
-                    className="mp-navbar-link"
-                    onClick={closeMenu}
-                  >
+                  <NavLink to="/login" className={navClass} onClick={closeMenu}>
                     Login
                   </NavLink>
+
                   <NavLink
                     to="/register"
-                    className="mp-navbar-btn-primary"
+                    className={({ isActive }) =>
+                      `mp-navbar-btn-primary ${
+                        isActive ? "mp-navbar-btn-primary--active" : ""
+                      }`
+                    }
                     onClick={closeMenu}
                   >
                     Join Free
@@ -183,32 +317,26 @@ export default function NavbarLayout() {
               )}
             </div>
 
+            {/* Right icons */}
             <div className="mp-navbar-icons-group" ref={dropdownRef}>
-              {isAuthenticated && (
+              {isAuthenticated && !isMobile && (
                 <div className="mp-dropdown-container">
                   <button
+                    type="button"
                     className="mp-user-avatar-btn"
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    onClick={() => setIsDropdownOpen((p) => !p)}
+                    aria-label="User menu"
                   >
                     <div className="mp-user-icon-circle">👤</div>
                   </button>
+
                   {isDropdownOpen && (
                     <div className="mp-dropdown-menu">
-                      {shouldShowUpgrade() && (
-                        <button
-                          className="mp-dropdown-upgrade-btn"
-                          onClick={() => {
-                            navigate("/upgrade");
-                            closeMenu();
-                          }}
-                        >
-                          🚀 {plan === "ARAMBH" ? "Upgrade Plan" : "Renew Plan"}
-                        </button>
-                      )}
                       <Link to="/account" onClick={closeMenu}>
                         My Profile
                       </Link>
                       <button
+                        type="button"
                         onClick={handleLogout}
                         className="mp-dropdown-logout-btn"
                       >
@@ -218,9 +346,12 @@ export default function NavbarLayout() {
                   )}
                 </div>
               )}
+
               <button
+                type="button"
                 className="mp-hamburger-btn"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                onClick={() => setIsMobileMenuOpen((p) => !p)}
+                aria-label="Toggle menu"
               >
                 {isMobileMenuOpen ? "✕" : "☰"}
               </button>
@@ -228,10 +359,9 @@ export default function NavbarLayout() {
           </div>
         </div>
       </nav>
+
       <main style={{ marginTop: "70px" }}>
-        <Outlet
-          context={{ hasStore, isAuthenticated, storeSlug, checkStatus }}
-        />
+        <Outlet context={{ hasStore, isAuthenticated, checkStatus }} />
       </main>
     </div>
   );

@@ -13,6 +13,7 @@ import Account from "./components/manageAccount/Account.jsx";
 import Upgrade from "./components/upgrade/Upgrade.jsx";
 import OrdersPage from "./components/order/OrdersPage.jsx";
 import OrderDetails from "./components/order/OrderDetails.jsx";
+import Analytics from "./components/analytics/Analytics.jsx";
 
 function App() {
   const slug = getStoreSlug();
@@ -37,6 +38,7 @@ function App() {
       <Route path="/manage/items" element={<ManageItems />} />
       <Route path="/orders" element={<OrdersPage />} />
       <Route path="/orders/:id" element={<OrderDetails />} />
+      <Route path="/analytics" element={<Analytics />} />
 
       {/* FALLBACK — IMPORTANT */}
       <Route
