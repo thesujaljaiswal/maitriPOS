@@ -1,3 +1,4 @@
+// Analytics.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
@@ -68,6 +69,7 @@ export default function Analytics() {
       const firstStore = Array.isArray(storeJson?.data)
         ? storeJson.data[0]
         : storeJson?.data;
+
       const storeId = firstStore?._id;
       if (!storeId) throw new Error("No store found");
       setStore(firstStore);
@@ -86,16 +88,19 @@ export default function Analytics() {
 
   useEffect(() => {
     fetchAnalytics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const revenue = data?.revenue || {};
   const orders = data?.orders || {};
-  const lifecycle = data?.lifecycle || {};
   const trend = data?.trend || [];
   const todayOrders = data?.todayOrders || [];
+  const topProducts = data?.topProducts || [];
 
   return (
     <div className="an-page">
+      <NavbarLayout />
+
       <div className="an-wrap">
         <div className="an-header">
           <div className="an-header__left">
@@ -116,12 +121,11 @@ export default function Analytics() {
           <div className="an-error">{err}</div>
         ) : (
           <>
-            <NavbarLayout />
             <div className="an-grid-cards">
               <Card
                 title="Today Revenue"
                 value={INR(revenue.today)}
-                sub={`Paid ${INR(revenue.paid)}`}
+                sub={`Paid ${INR(revenue.paid)} • Pending ${INR(revenue.pending)}`}
                 right={<GrowthPill value={revenue.todayGrowth} />}
               />
               <Card
@@ -187,14 +191,22 @@ export default function Analytics() {
                 </div>
               </Section>
 
-              <Section title="Lifecycle">
+              <Section title="Top Products (This Month)">
                 <div className="an-life">
-                  {["packed", "shipped", "delivered"].map((key) => (
-                    <div className="an-life__row" key={key}>
-                      <span className="an-life__label">{key}</span>
-                      <b className="an-life__val">{lifecycle[key] ?? 0}</b>
+                  {topProducts.length ? (
+                    topProducts.map((p) => (
+                      <div className="an-life__row" key={p.name}>
+                        <span className="an-life__label">{p.name}</span>
+                        <b className="an-life__val">
+                          {p.qty} • {INR(p.revenue)}
+                        </b>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="an-muted" style={{ padding: 0 }}>
+                      No product data yet
                     </div>
-                  ))}
+                  )}
                 </div>
               </Section>
             </div>
@@ -211,30 +223,38 @@ export default function Analytics() {
                     </tr>
                   </thead>
                   <tbody>
-                    {todayOrders.map((o) => (
-                      <tr key={o._id}>
-                        <td className="an-td-muted">
-                          {o.createdAt
-                            ? new Date(o.createdAt).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
-                            : "-"}
-                        </td>
-                        <td>
-                          <div className="an-orderid">
-                            #{String(o._id).slice(-6)}
-                          </div>
-                          <div className="an-small">
-                            {o.customerName || "Walk-in"}
-                          </div>
-                        </td>
-                        <td className="an-cap">{o.status}</td>
-                        <td className="an-right an-strong">
-                          {INR(o.totalAmount)}
+                    {todayOrders.length ? (
+                      todayOrders.map((o) => (
+                        <tr key={o._id}>
+                          <td className="an-td-muted">
+                            {o.createdAt
+                              ? new Date(o.createdAt).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                              : "-"}
+                          </td>
+                          <td>
+                            <div className="an-orderid">
+                              #{String(o._id).slice(-6)}
+                            </div>
+                            <div className="an-small">
+                              {o.customerName || "Walk-in"}
+                            </div>
+                          </td>
+                          <td className="an-cap">{o.status}</td>
+                          <td className="an-right an-strong">
+                            {INR(o.totalAmount)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="an-muted">
+                          No orders today
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>

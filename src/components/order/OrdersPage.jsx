@@ -1,8 +1,16 @@
+// OrdersPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CreateOrderModal from "./CreateOrderModal";
 import "./style.css";
 import NavbarLayout from "../navbar/Navbar";
+
+const INR = (n = 0) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(n || 0));
 
 export default function OrdersPage() {
   const navigate = useNavigate();
@@ -14,6 +22,7 @@ export default function OrdersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [isPlanBlocked, setIsPlanBlocked] = useState(false);
+  const [updatingPaymentId, setUpdatingPaymentId] = useState("");
 
   const statusWeight = {
     accepted: 1,
@@ -25,9 +34,9 @@ export default function OrdersPage() {
 
   const fetchMyStore = async () => {
     const res = await fetch(`${api}/store/me`, { credentials: "include" });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     const store = data?.data?.[0] || data?.data;
-    if (!store?._id) throw new Error("Store not found.");
+    if (!store?._id) throw new Error(data?.message || "Store not found.");
     return store._id;
   };
 
@@ -35,14 +44,24 @@ export default function OrdersPage() {
     const res = await fetch(`${api}/order/store/${sid}`, {
       credentials: "include",
     });
-    const data = await res.json();
+
+    const data = await res.json().catch(() => ({}));
+
+    // ✅ backend now uses 403 for ownership too
+    // treat BOTH plan-block and not-owner the same UX if you want
     if (res.status === 403) {
       setIsPlanBlocked(true);
-      setErrorMsg(data?.message || "Upgrade your plan.");
-      alert("Upgrade Your Plan to access Orders");
+      setErrorMsg(
+        data?.message || "Access denied. Upgrade plan or check store.",
+      );
+      alert(data?.message || "Access denied.");
       navigate("/");
+      return;
     }
-    if (data.success) setOrders(data.data || []);
+
+    if (res.ok && data?.success)
+      setOrders(Array.isArray(data.data) ? data.data : []);
+    else setErrorMsg(data?.message || "Failed to load orders");
   };
 
   const handleUpdateStatus = async (orderId, currentStatus, newStatus) => {
@@ -71,27 +90,82 @@ export default function OrdersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      const data = await res.json();
-      if (data.success) {
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data?.success) {
+        // ✅ backend updates timeline, but card doesn't need it
         setOrders((prev) =>
           prev.map((o) =>
             o._id === orderId ? { ...o, status: newStatus } : o,
           ),
         );
+        return;
       }
-    } catch (err) {
+
+      alert(data?.message || "Status update failed.");
+    } catch {
       alert("Status update failed.");
+    }
+  };
+
+  // ✅ toggle payment status (pending <-> paid) — backend blocks if cancelled
+  const handleTogglePayment = async (
+    orderId,
+    currentPaymentStatus,
+    isCancelled,
+  ) => {
+    if (!orderId) return;
+    if (isCancelled) return;
+
+    const nextStatus = currentPaymentStatus === "paid" ? "pending" : "paid";
+
+    setUpdatingPaymentId(orderId);
+    try {
+      const res = await fetch(`${api}/order/${orderId}/payment`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentStatus: nextStatus }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data?.success) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o._id === orderId
+              ? {
+                  ...o,
+                  payment: {
+                    ...(o.payment || {}),
+                    paymentStatus: nextStatus,
+                  },
+                }
+              : o,
+          ),
+        );
+        return;
+      }
+
+      alert(data?.message || "Payment update failed.");
+    } catch {
+      alert("Payment update failed.");
+    } finally {
+      setUpdatingPaymentId("");
     }
   };
 
   const refresh = async () => {
     setLoading(true);
+    setErrorMsg("");
+    setIsPlanBlocked(false);
     try {
       const sid = await fetchMyStore();
       setStoreId(sid);
       await fetchOrders(sid);
     } catch (e) {
-      setErrorMsg(e.message);
+      setErrorMsg(e?.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -99,17 +173,21 @@ export default function OrdersPage() {
 
   useEffect(() => {
     refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <>
       <NavbarLayout />
+
       <div className="ord-page">
         <div className="ord-header">
           <div>
             <h1 className="ord-title">Orders</h1>
             <p className="ord-subtitle">Fulfillment dashboard.</p>
+            {errorMsg ? <div className="ord-error">{errorMsg}</div> : null}
           </div>
+
           <div className="ord-actions">
             <button className="ord-btn" onClick={refresh}>
               Refresh
@@ -131,25 +209,55 @@ export default function OrdersPage() {
             {orders.map((o) => {
               const isLocked =
                 o.status === "delivered" || o.status === "cancelled";
+
+              const custName = o.customer?.name?.trim() || "Walk-in";
+              const custPhone = o.customer?.phone?.trim() || "";
+              const paymentStatus = o.payment?.paymentStatus || "pending";
+
               return (
                 <div key={o._id} className="ord-card-v2">
                   <div className="ord-card-v2-header">
                     <div className="ord-id-badge">#{o.orderId}</div>
-                    <div className={`ord-status-chip ${o.status}`}>
-                      {o.status}
+
+                    <div className="ord-chip-row">
+                      <div className={`ord-status-chip ${o.status}`}>
+                        {o.status}
+                      </div>
+
+                      <button
+                        type="button"
+                        className={`ord-pay-chip ${paymentStatus}`}
+                        disabled={
+                          o.status === "cancelled" ||
+                          updatingPaymentId === o._id ||
+                          o.status === "delivered"
+                        }
+                        onClick={() =>
+                          handleTogglePayment(
+                            o._id,
+                            paymentStatus,
+                            o.status === "cancelled",
+                          )
+                        }
+                        title={
+                          o.status === "cancelled"
+                            ? "Cancelled orders cannot change payment"
+                            : "Click to toggle payment status"
+                        }
+                      >
+                        {updatingPaymentId === o._id
+                          ? "Updating..."
+                          : paymentStatus}
+                      </button>
                     </div>
                   </div>
 
                   <div className="ord-card-v2-content">
                     <div className="ord-customer-sect">
-                      <div className="ord-avatar">
-                        {o.customer?.name?.[0] || "C"}
-                      </div>
+                      <div className="ord-avatar">{custName?.[0] || "C"}</div>
                       <div>
-                        <div className="ord-cust-name">{o.customer?.name}</div>
-                        <div className="ord-cust-phone">
-                          {o.customer?.phone}
-                        </div>
+                        <div className="ord-cust-name">{custName}</div>
+                        <div className="ord-cust-phone">{custPhone}</div>
                       </div>
                     </div>
 
@@ -157,13 +265,25 @@ export default function OrdersPage() {
                       {o.products?.slice(0, 2).map((p, i) => (
                         <div key={i} className="ord-item-row">
                           <span>
-                            {p.quantity}x {p.name}
+                            {p.quantity}x {p.name}(
+                            {p.variantName ? (
+                              <span className="ord-variant-pill">
+                                {p.variantName}
+                              </span>
+                            ) : (
+                              <span className="ord-variant-pill">Regular</span>
+                            )}
+                            )
                           </span>
+
                           <span className="ord-item-price">
-                            ₹{p.price * p.quantity}
+                            {INR(
+                              Number(p.price || 0) * Number(p.quantity || 0),
+                            )}
                           </span>
                         </div>
                       ))}
+
                       {o.products?.length > 2 && (
                         <div className="ord-more-items">
                           +{o.products.length - 2} more items
@@ -175,7 +295,7 @@ export default function OrdersPage() {
                   <div className="ord-card-v2-footer">
                     <div className="ord-total-box">
                       <span className="label">Total Amount</span>
-                      <span className="value">₹{o.totalAmount}</span>
+                      <span className="value">{INR(o.totalAmount)}</span>
                     </div>
 
                     <div className="ord-actions-v2">
@@ -185,6 +305,7 @@ export default function OrdersPage() {
                       >
                         View Details
                       </button>
+
                       <select
                         className="ord-status-dropdown"
                         value={o.status}
