@@ -152,7 +152,7 @@ export default function OrderDetails() {
                 <table className="ord-table">
                   <thead>
                     <tr>
-                      <th>Product</th>
+                      <th className="ord-item-name">Product</th>
                       <th>Price</th>
                       <th>Qty</th>
                       <th>Total</th>
@@ -161,7 +161,7 @@ export default function OrderDetails() {
                   <tbody>
                     {(order.products || []).map((p, i) => (
                       <tr key={i}>
-                        <td>
+                        <td className="ord-item-name">
                           <strong>{p.name}</strong>
                           <div className="muted">
                             {p.variantName || "Regular"}
@@ -177,6 +177,9 @@ export default function OrderDetails() {
                   </tbody>
                 </table>
               </div>
+              <p className="ord-message">
+                Above items table is scrollable &larr;&rarr;
+              </p>
 
               <div className="ord-summary">
                 <div className="ord-sum-row">

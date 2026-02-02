@@ -33,6 +33,11 @@ export default function CreateOrderModal({
   const [saving, setSaving] = useState(false);
   const [alert, setAlert] = useState({ message: "", type: "" });
 
+  // ✅ Variant popup flow
+  const [variantPopupOpen, setVariantPopupOpen] = useState(false);
+  const [pending, setPending] = useState(null);
+  // pending: { itemId, name, variants: [{_id,name,price}], selectedVariantId }
+
   const showAlert = (message, type = "error") => {
     setAlert({ message, type });
     window.clearTimeout(showAlert._t);
@@ -105,32 +110,15 @@ export default function CreateOrderModal({
   const makeKey = (itemId, variantId) =>
     `${String(itemId)}:${variantId ? String(variantId) : "regular"}`;
 
-  const handleAddItem = (itemId) => {
-    if (!itemId) return;
-
-    const item = itemsList.find((it) => String(it._id) === String(itemId));
-    if (!item) return;
-
-    const variants = (item.variants || [])
-      .filter((v) => v && v.price != null)
-      .map((v) => ({
-        _id: String(v._id),
-        name: v.name || "Variant",
-        price: Number(v.price || 0),
-      }));
-
-    // ✅ backend logic:
-    // - if item has variants and user hasn't chosen one yet, we should NOT default to "Regular"
-    //   because backend requires variantId to match when variants exist (or you will create base price order).
-    const hasVariants = variants.length > 0;
-
-    const defaultVariant = hasVariants ? variants[0] : null;
-    const defaultVariantId = defaultVariant ? defaultVariant._id : "";
-    const defaultPrice = defaultVariant
-      ? defaultVariant.price
-      : Number(item.price || 0);
-
-    const key = makeKey(item._id, defaultVariantId || null);
+  // ✅ Adds a line OR increments qty if same item+variant already exists
+  const addOrIncrement = ({
+    itemId,
+    name,
+    variantId,
+    variantName,
+    unitPrice,
+  }) => {
+    const key = makeKey(itemId, variantId || null);
 
     const existingIndex = orderProducts.findIndex((p) => p.key === key);
     if (existingIndex !== -1) {
@@ -146,55 +134,93 @@ export default function CreateOrderModal({
       ...prev,
       {
         key,
-        itemId: String(item._id),
-        name: item.name,
+        itemId: String(itemId),
+        name,
+        hasVariants: Boolean(variantId),
+        variants: [], // not needed for now (we select variant before adding)
 
-        hasVariants,
-        variants,
+        selectedVariantId: variantId ? String(variantId) : "",
+        selectedVariantName: variantName || "Regular",
 
-        // ✅ always send variantId if variants exist; preselect first for speed
-        selectedVariantId: defaultVariantId,
-        selectedVariantName: defaultVariant ? defaultVariant.name : "Regular",
-
-        unitPrice: defaultPrice, // purely UI; backend recomputes anyway
+        unitPrice: Number(unitPrice || 0),
         quantity: 1,
       },
     ]);
   };
 
-  const handleVariantChange = (index, variantId) => {
-    setOrderProducts((prev) =>
-      prev.map((p, i) => {
-        if (i !== index) return p;
+  // ✅ Product picker:
+  // - no variants => add directly
+  // - has variants => open variant popup (preselect first variant)
+  const handlePickProduct = (itemId) => {
+    if (!itemId) return;
 
-        // ✅ if item has variants, don't allow empty selection (keeps backend happy)
-        if (p.hasVariants && !variantId) {
-          return p;
-        }
+    const item = itemsList.find((it) => String(it._id) === String(itemId));
+    if (!item) return;
 
-        if (!variantId) {
-          // item has no variants
-          return {
-            ...p,
-            key: makeKey(p.itemId, null),
-            selectedVariantId: "",
-            selectedVariantName: "Regular",
-            unitPrice: Number(p.unitPrice || 0),
-          };
-        }
+    const variants = (item.variants || [])
+      .filter((v) => v && v.price != null)
+      .map((v) => ({
+        _id: String(v._id),
+        name: v.name || "Variant",
+        price: Number(v.price || 0),
+      }));
 
-        const v = p.variants.find((x) => String(x._id) === String(variantId));
-        if (!v) return p;
+    const hasVariants = variants.length > 0;
 
-        return {
-          ...p,
-          key: makeKey(p.itemId, v._id),
-          selectedVariantId: v._id,
-          selectedVariantName: v.name || "Variant",
-          unitPrice: Number(v.price || 0),
-        };
-      }),
+    if (!hasVariants) {
+      addOrIncrement({
+        itemId: item._id,
+        name: item.name,
+        variantId: "",
+        variantName: "Regular",
+        unitPrice: Number(item.price || 0),
+      });
+      return;
+    }
+
+    setPending({
+      itemId: String(item._id),
+      name: item.name,
+      variants,
+      selectedVariantId: variants[0]?._id || "",
+    });
+    setVariantPopupOpen(true);
+  };
+
+  const closeVariantPopup = () => {
+    setVariantPopupOpen(false);
+    setPending(null);
+  };
+
+  const confirmAddPendingVariant = () => {
+    if (!pending) return;
+
+    const v = pending.variants.find(
+      (x) => String(x._id) === String(pending.selectedVariantId),
     );
+    if (!v) {
+      showAlert("Select a variant first.");
+      return;
+    }
+
+    addOrIncrement({
+      itemId: pending.itemId,
+      name: pending.name,
+      variantId: v._id,
+      variantName: v.name,
+      unitPrice: v.price,
+    });
+
+    closeVariantPopup();
+  };
+
+  // ✅ keyboard: Enter adds variant
+  const onVariantPopupKeyDown = (e) => {
+    if (e.key === "Escape") closeVariantPopup();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      confirmAddPendingVariant();
+    }
   };
 
   const updateQty = (index, delta) => {
@@ -218,8 +244,6 @@ export default function CreateOrderModal({
     [orderProducts],
   );
 
-  // ✅ backend uses server-truth totals, but still validates subtotal
-  // keep discount/tax inputs numeric and non-negative
   const discount = Math.max(0, Number(form.discount || 0));
   const taxPercent = Math.max(0, Number(form.taxPercent || 0));
 
@@ -237,26 +261,21 @@ export default function CreateOrderModal({
     e.preventDefault();
 
     if (!orderProducts.length) return showAlert("Add items.");
-    if (orderProducts.some((p) => p.hasVariants && !p.selectedVariantId)) {
-      return showAlert("Select variants.");
-    }
 
-    // ✅ IMPORTANT with new backend:
-    // Backend will verify subtotal matches its computed subtotal.
-    // So we must ensure our subtotal uses same variant pricing. (we do)
+    // ✅ if popup open, force user to finish it
+    if (variantPopupOpen) return showAlert("Finish selecting the variant.");
+
     setSaving(true);
     try {
       const payload = {
         storeId,
         items: orderProducts.map((p) => ({
           itemId: p.itemId,
-          // ✅ send variantId ONLY if present
           ...(p.selectedVariantId ? { variantId: p.selectedVariantId } : {}),
           quantity: p.quantity,
         })),
         pricing: {
           subtotal,
-          // backend recomputes totalAmount; still okay to send for UI/logging
           discount,
           tax: taxAmount,
           totalAmount,
@@ -282,6 +301,7 @@ export default function CreateOrderModal({
         onClose?.();
         setOrderProducts([]);
         setForm({ ...emptyForm });
+        closeVariantPopup();
         return;
       }
 
@@ -295,6 +315,7 @@ export default function CreateOrderModal({
 
   const close = () => {
     if (saving) return;
+    closeVariantPopup();
     onClose?.();
   };
 
@@ -322,8 +343,9 @@ export default function CreateOrderModal({
         <form onSubmit={handleSubmit} className="ord-form">
           <div className="ord-row">
             <div className="ord-field">
-              <label>Customer Name</label>
+              <label className="ord-label">Customer Name</label>
               <input
+                className="ord-input"
                 name="customerName"
                 value={form.customerName}
                 onChange={handleChange}
@@ -331,8 +353,9 @@ export default function CreateOrderModal({
               />
             </div>
             <div className="ord-field">
-              <label>Customer Phone</label>
+              <label className="ord-label">Customer Phone</label>
               <input
+                className="ord-input"
                 name="customerPhone"
                 value={form.customerPhone}
                 onChange={handleChange}
@@ -374,13 +397,13 @@ export default function CreateOrderModal({
             <select
               className="ord-product-dropdown"
               value=""
-              onChange={(e) => handleAddItem(e.target.value)}
+              onChange={(e) => handlePickProduct(e.target.value)}
               disabled={loadingItems}
             >
               <option value="">
                 {loadingItems
                   ? "Loading items..."
-                  : "-- Choose an item from list --"}
+                  : "-- Add an item from list --"}
               </option>
 
               {groupedItems.map((group) => (
@@ -421,20 +444,10 @@ export default function CreateOrderModal({
                       </td>
 
                       <td>
-                        {p.hasVariants ? (
-                          <select
-                            className="ord-variant-select"
-                            value={p.selectedVariantId}
-                            onChange={(e) =>
-                              handleVariantChange(idx, e.target.value)
-                            }
-                          >
-                            {p.variants.map((v) => (
-                              <option key={v._id} value={v._id}>
-                                {v.name} (₹{v.price})
-                              </option>
-                            ))}
-                          </select>
+                        {p.selectedVariantId ? (
+                          <span className="ord-variant-pill">
+                            {p.selectedVariantName}
+                          </span>
                         ) : (
                           <span className="muted">Regular</span>
                         )}
@@ -484,7 +497,7 @@ export default function CreateOrderModal({
               </table>
 
               <div className="ord-tip">
-                Tip: selecting an item again increases quantity.
+                Tip: selecting the same variant again increases quantity.
               </div>
             </div>
           )}
@@ -496,8 +509,9 @@ export default function CreateOrderModal({
             </div>
 
             <div className="ord-sum-row">
-              <span>Discount</span>
+              <label className="ord-label">Discount</label>
               <input
+                className="ord-input ord-input-sm"
                 name="discount"
                 type="number"
                 value={form.discount}
@@ -507,8 +521,9 @@ export default function CreateOrderModal({
             </div>
 
             <div className="ord-sum-row">
-              <span>Tax (%)</span>
+              <label className="ord-label">Tax (%)</label>
               <input
+                className="ord-input ord-input-sm"
                 name="taxPercent"
                 type="number"
                 value={form.taxPercent}
@@ -541,6 +556,79 @@ export default function CreateOrderModal({
             </button>
           </div>
         </form>
+
+        {/* ✅ Variant popup (effortless UX) */}
+        {variantPopupOpen && pending && (
+          <div className="ord-mini-backdrop" onMouseDown={closeVariantPopup}>
+            <div
+              className="ord-mini-modal"
+              onMouseDown={(e) => e.stopPropagation()}
+              onKeyDown={onVariantPopupKeyDown}
+              tabIndex={0}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="ord-mini-head">
+                <div>
+                  <div className="ord-mini-title">Choose Variant</div>
+                  <div className="ord-mini-sub">
+                    {pending.name} • same variant adds quantity
+                  </div>
+                </div>
+
+                <button
+                  className="ord-x"
+                  type="button"
+                  onClick={closeVariantPopup}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="ord-mini-body">
+                <select
+                  className="ord-variant-select"
+                  value={pending.selectedVariantId}
+                  onChange={(e) =>
+                    setPending((p) => ({
+                      ...p,
+                      selectedVariantId: e.target.value,
+                    }))
+                  }
+                >
+                  {pending.variants.map((v) => (
+                    <option key={v._id} value={v._id}>
+                      {v.name} (₹{v.price})
+                    </option>
+                  ))}
+                </select>
+
+                <div className="ord-mini-actions">
+                  <button
+                    type="button"
+                    className="ord-btn"
+                    onClick={closeVariantPopup}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    className="ord-btn-primary"
+                    onClick={confirmAddPendingVariant}
+                  >
+                    Add
+                  </button>
+                </div>
+
+                <div className="muted ord-mini-hint">
+                  Press <b>Enter</b> to add • <b>Esc</b> to close
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

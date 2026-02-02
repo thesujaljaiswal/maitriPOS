@@ -410,9 +410,9 @@ export default function Landing() {
                   ["Catalog + public link", "✅", "✅"],
                   ["Categories + Sub-Categories", "✅", "✅"],
                   ["Products + Variants", "✅", "✅"],
-                  ["Customer ordering", "❌", "✅"],
-                  ["Manage orders", "❌", "✅"],
-                  ["Realtime Analytics", "❌", "✅"],
+                  ["Order Management Dashboard", "❌", "✅"],
+                  ["Order Tracking Feature", "❌", "✅"],
+                  ["Basic Analysis", "❌", "✅"],
                 ].map((r) => (
                   <div className="lp-row lp-row--two" key={r[0]}>
                     <div className="lp-feature">{r[0]}</div>

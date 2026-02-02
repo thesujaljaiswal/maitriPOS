@@ -23,6 +23,13 @@ export default function OrdersPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [isPlanBlocked, setIsPlanBlocked] = useState(false);
   const [updatingPaymentId, setUpdatingPaymentId] = useState("");
+  const [toast, setToast] = useState("");
+
+  const flash = (m) => {
+    setToast(m);
+    window.clearTimeout(flash._t);
+    flash._t = window.setTimeout(() => setToast(""), 2200);
+  };
 
   const statusWeight = {
     accepted: 1,
@@ -47,8 +54,6 @@ export default function OrdersPage() {
 
     const data = await res.json().catch(() => ({}));
 
-    // ✅ backend now uses 403 for ownership too
-    // treat BOTH plan-block and not-owner the same UX if you want
     if (res.status === 403) {
       setIsPlanBlocked(true);
       setErrorMsg(
@@ -64,8 +69,21 @@ export default function OrdersPage() {
     else setErrorMsg(data?.message || "Failed to load orders");
   };
 
-  const handleUpdateStatus = async (orderId, currentStatus, newStatus) => {
+  // ✅ Status update with rule:
+  // pending payment => cannot deliver
+  const handleUpdateStatus = async (
+    orderId,
+    currentStatus,
+    newStatus,
+    paymentStatus,
+  ) => {
     if (currentStatus === "delivered" || currentStatus === "cancelled") return;
+
+    // ✅ HARD RULE: cannot deliver unless paid
+    if (newStatus === "delivered" && paymentStatus !== "paid") {
+      flash("Mark payment as PAID before delivering.");
+      return;
+    }
 
     if (
       statusWeight[newStatus] < statusWeight[currentStatus] &&
@@ -94,7 +112,6 @@ export default function OrdersPage() {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok && data?.success) {
-        // ✅ backend updates timeline, but card doesn't need it
         setOrders((prev) =>
           prev.map((o) =>
             o._id === orderId ? { ...o, status: newStatus } : o,
@@ -109,7 +126,7 @@ export default function OrdersPage() {
     }
   };
 
-  // ✅ toggle payment status (pending <-> paid) — backend blocks if cancelled
+  // ✅ toggle payment status (pending <-> paid)
   const handleTogglePayment = async (
     orderId,
     currentPaymentStatus,
@@ -145,6 +162,9 @@ export default function OrdersPage() {
               : o,
           ),
         );
+
+        if (nextStatus === "paid")
+          flash("Payment marked as PAID. You can deliver now.");
         return;
       }
 
@@ -186,6 +206,11 @@ export default function OrdersPage() {
             <h1 className="ord-title">Orders</h1>
             <p className="ord-subtitle">Fulfillment dashboard.</p>
             {errorMsg ? <div className="ord-error">{errorMsg}</div> : null}
+            {toast ? (
+              <div className="ord-alert is-success" style={{ marginTop: 10 }}>
+                {toast}
+              </div>
+            ) : null}
           </div>
 
           <div className="ord-actions">
@@ -193,7 +218,7 @@ export default function OrdersPage() {
               Refresh
             </button>
             <button
-              className="ord-btn ord-btn-primary"
+              className="ord-btn-primary"
               onClick={() => setIsModalOpen(true)}
               disabled={isPlanBlocked}
             >
@@ -213,6 +238,8 @@ export default function OrdersPage() {
               const custName = o.customer?.name?.trim() || "Walk-in";
               const custPhone = o.customer?.phone?.trim() || "";
               const paymentStatus = o.payment?.paymentStatus || "pending";
+
+              const deliveredDisabled = paymentStatus !== "paid";
 
               return (
                 <div key={o._id} className="ord-card-v2">
@@ -242,7 +269,9 @@ export default function OrdersPage() {
                         title={
                           o.status === "cancelled"
                             ? "Cancelled orders cannot change payment"
-                            : "Click to toggle payment status"
+                            : o.status === "delivered"
+                              ? "Delivered orders cannot change payment"
+                              : "Click to toggle payment status"
                         }
                       >
                         {updatingPaymentId === o._id
@@ -311,15 +340,39 @@ export default function OrdersPage() {
                         value={o.status}
                         disabled={isLocked}
                         onChange={(e) =>
-                          handleUpdateStatus(o._id, o.status, e.target.value)
+                          handleUpdateStatus(
+                            o._id,
+                            o.status,
+                            e.target.value,
+                            paymentStatus,
+                          )
+                        }
+                        title={
+                          deliveredDisabled
+                            ? "To deliver, first mark payment as PAID"
+                            : "Update fulfillment status"
                         }
                       >
                         <option value="accepted">Accept</option>
                         <option value="packed">Pack</option>
                         <option value="shipped">Ship</option>
-                        <option value="delivered">Deliver</option>
+
+                        {/* ✅ disable delivered until paid */}
+                        <option value="delivered" disabled={deliveredDisabled}>
+                          {deliveredDisabled
+                            ? "Deliver (Paid required)"
+                            : "Deliver"}
+                        </option>
+
                         <option value="cancelled">Cancel</option>
                       </select>
+
+                      {/* ✅ small hint when pending */}
+                      {!isLocked && deliveredDisabled ? (
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Pay first to deliver
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
