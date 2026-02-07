@@ -14,6 +14,7 @@ import Upgrade from "./components/upgrade/Upgrade.jsx";
 import OrdersPage from "./components/order/OrdersPage.jsx";
 import OrderDetails from "./components/order/OrderDetails.jsx";
 import Analytics from "./components/analytics/Analytics.jsx";
+import ExpenseTracker from "./components/expenseTracker/ExpenseTracker.jsx";
 
 function App() {
   const slug = getStoreSlug();
@@ -39,6 +40,7 @@ function App() {
       <Route path="/orders" element={<OrdersPage />} />
       <Route path="/orders/:id" element={<OrderDetails />} />
       <Route path="/analytics" element={<Analytics />} />
+      <Route path="/track/expense" element={<ExpenseTracker />} />
 
       {/* FALLBACK — IMPORTANT */}
       <Route

@@ -37,11 +37,12 @@ const PLANS = [
       "Manage Orders (Accepted → Packed → Shipped → Delivered)",
       "Payments tracking (Paid / Pending)",
       "Analytics dashboard (Revenue + Trend)",
+      "Expense tracker",
     ],
     demo: {
       header: "Ordering Demo",
       steps: ["Customer scans QR", "You Place orders", "manage order status"],
-      chips: ["Orders", "Management", "Analytics"],
+      chips: ["Order Management", "Expense Tracker", "Analytics"],
     },
   },
 ];
@@ -412,7 +413,8 @@ export default function Landing() {
                   ["Products + Variants", "✅", "✅"],
                   ["Order Management Dashboard", "❌", "✅"],
                   ["Order Tracking Feature", "❌", "✅"],
-                  ["Basic Analysis", "❌", "✅"],
+                  ["Basic Analytics", "❌", "✅"],
+                  ["Expense Tracker", "❌", "✅"],
                 ].map((r) => (
                   <div className="lp-row lp-row--two" key={r[0]}>
                     <div className="lp-feature">{r[0]}</div>

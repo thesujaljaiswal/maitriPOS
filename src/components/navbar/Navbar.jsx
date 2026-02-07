@@ -267,6 +267,11 @@ export default function NavbarLayout() {
                           </Link>
                         )}
                         {(plan === "PRAVAH" || plan === "UTSAH") && (
+                          <Link to="/track/expense" onClick={closeMenu}>
+                            Expense tracker
+                          </Link>
+                        )}
+                        {(plan === "PRAVAH" || plan === "UTSAH") && (
                           <Link to="/analytics" onClick={closeMenu}>
                             Analytics
                           </Link>
