@@ -1,6 +1,6 @@
-/* style.css (Navbar fixes + responsive + overlay + active state) */
+/* Navbar style.css — simple + aligned + clean */
 
-/* Core Reset */
+/* ===== Top Bar ===== */
 .mp-navbar-root {
   position: fixed;
   top: 0;
@@ -18,41 +18,40 @@
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 16px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
 }
 
-/* Brand */
+/* ===== Brand ===== */
 .mp-navbar-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   text-decoration: none;
-  font-weight: 800;
   color: #000;
-  z-index: 2002;
+  font-weight: 800;
 }
 .mp-navbar-brand img {
   height: 30px;
 }
 
-/* Right Section */
+/* ===== Right Area ===== */
 .mp-nav-right-section {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 14px;
 }
 
-/* Links wrapper (desktop default) */
+/* Desktop links row */
 .mp-navbar-links-wrapper {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
 }
 
-/* Links & Buttons */
+/* ===== Links / Buttons ===== */
 .mp-navbar-link {
   text-decoration: none;
   color: #555;
@@ -61,6 +60,8 @@
   background: none;
   border: none;
   cursor: pointer;
+  padding: 8px 0;
+  line-height: 1;
   white-space: nowrap;
 }
 .mp-navbar-link:hover {
@@ -69,38 +70,34 @@
 
 .mp-navbar-link--active {
   color: #000;
-  position: relative;
-}
-.mp-navbar-link--active::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: -8px;
-  height: 2px;
-  width: 100%;
-  background: #000;
-  border-radius: 999px;
 }
 
 .mp-navbar-btn-primary {
   background: #000;
   color: #fff;
-  padding: 8px 16px;
-  border-radius: 6px;
+  padding: 9px 14px;
+  border-radius: 10px;
   text-decoration: none;
   font-size: 14px;
   font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
 }
 .mp-navbar-btn-primary:hover {
   opacity: 0.92;
 }
 
-/* Dropdowns Desktop */
+.mp-visit-store {
+  color: rgb(60, 60, 232);
+}
+
+/* ===== Product/Business dropdown (desktop) ===== */
 .mp-nav-dropdown {
   position: relative;
-  height: 70px;
   display: flex;
   align-items: center;
+  height: 70px;
 }
 
 .mp-dropdown-trigger {
@@ -111,17 +108,17 @@
 
 .mp-nav-dropdown-content {
   position: absolute;
-  top: 65px;
+  top: calc(100% - 6px);
   left: 0;
+  min-width: 190px;
   background: #fff;
   border: 1px solid #eee;
-  border-radius: 8px;
-  min-width: 180px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
+  padding: 6px;
   display: none;
   flex-direction: column;
-  padding: 8px 0;
-  z-index: 2005;
+  z-index: 2100;
 }
 
 .mp-nav-dropdown-content.show {
@@ -129,96 +126,100 @@
 }
 
 .mp-nav-dropdown-content a {
-  padding: 10px 20px;
   text-decoration: none;
   color: #444;
   font-size: 14px;
+  padding: 10px 10px;
+  border-radius: 8px;
 }
 .mp-nav-dropdown-content a:hover {
-  background: #f8f9fa;
+  background: #f6f6f6;
   color: #000;
 }
 
-/* User menu */
+/* ===== User icon + dropdown ===== */
 .mp-navbar-icons-group {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.mp-dropdown-container {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .mp-user-avatar-btn {
   background: none;
   border: none;
-  cursor: pointer;
   padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
 }
 
 .mp-user-icon-circle {
   width: 36px;
   height: 36px;
-  background: #f4f4f4;
   border-radius: 50%;
+  border: 1px solid #ddd;
+  background: #f4f4f4;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #ddd;
 }
 
-.mp-dropdown-container {
-  position: relative;
-}
-
+/* user dropdown panel */
 .mp-dropdown-menu {
   position: absolute;
-  top: 50px;
+  top: calc(100% + 10px);
   right: 0;
+  width: 210px;
   background: #fff;
   border: 1px solid #eee;
-  width: 180px;
-  border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  padding: 8px 0;
-  z-index: 2100;
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
+  padding: 6px;
+  z-index: 2200;
 }
 
+/* default rows in dropdown */
 .mp-dropdown-menu a,
 .mp-dropdown-logout-btn {
-  display: block;
   width: 100%;
-  text-align: left;
-  padding: 10px 14px;
-  font-size: 14px;
-  color: #444;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 10px;
+  text-decoration: none;
   background: none;
   border: none;
   cursor: pointer;
-  text-decoration: none;
+  color: #333;
+  font-size: 14px;
+  text-align: left;
 }
+
 .mp-dropdown-menu a:hover,
 .mp-dropdown-logout-btn:hover {
-  background: #f8f9fa;
-  color: #000;
+  background: #f6f6f6;
 }
 
 .mp-dropdown-logout-btn {
-  color: red;
+  color: #d40000;
   font-weight: 700;
 }
 
-/* Mobile overlay */
+/* ===== Mobile menu overlay ===== */
 .mp-mobile-overlay {
   display: none;
 }
 
-.mp-logout-link {
-  width: 100%;
-  text-align: left;
-  padding: 15px 0;
-  border-bottom: 1px solid #f5f5f5;
-}
-
-/* Hamburger */
+/* ===== Hamburger ===== */
 .mp-hamburger-btn {
   display: none;
   font-size: 24px;
@@ -226,19 +227,20 @@
   border: none;
   cursor: pointer;
   line-height: 1;
+  padding: 6px 8px;
+  border-radius: 10px;
 }
-.mp-visit-store {
-  color: rgb(60, 60, 232);
+.mp-hamburger-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
 }
 
-/* RESPONSIVE BREAKPOINT */
+/* ===== Mobile Drawer ===== */
 @media (max-width: 992px) {
   .mp-hamburger-btn {
     display: block;
     z-index: 2003;
   }
 
-  /* show overlay when menu open */
   .mp-mobile-overlay.show {
     display: block;
     position: fixed;
@@ -250,19 +252,18 @@
   .mp-navbar-links-wrapper {
     position: fixed;
     top: 0;
-    left: -120%;
+    left: -110%;
     width: min(420px, 92vw);
     height: 100vh;
     background: #fff;
     flex-direction: column;
-    padding-top: 90px;
-    padding-left: 18px;
-    padding-right: 18px;
-    transition: 0.35s ease-in-out;
     align-items: flex-start;
+    padding: 90px 18px 20px;
     gap: 0;
-    z-index: 2000;
     overflow-y: auto;
+    transition: 0.3s ease;
+    z-index: 2000;
+    box-sizing: border-box;
   }
 
   .mp-navbar-links-wrapper.active {
@@ -273,41 +274,45 @@
   .mp-nav-dropdown,
   .mp-navbar-btn-primary {
     width: 100%;
-    height: auto;
-    padding: 14px 0;
-    border-bottom: 1px solid #f5f5f5;
+    box-sizing: border-box;
     display: block;
+    padding: 14px 0;
+    border-bottom: 1px solid #f3f3f3;
     text-align: left;
   }
 
-  .mp-navbar-link--active::after {
-    display: none; /* active underline looks odd in drawer */
+  .mp-navbar-btn-primary {
+    width: 100%;
+    justify-content: center;
+    border-bottom: none;
+    margin-top: 14px;
+    padding: 12px 16px;
   }
 
-  /* Dropdown becomes inline accordion */
+  /* dropdown becomes accordion */
   .mp-nav-dropdown {
     height: auto;
     padding: 0;
-    border-bottom: 1px solid #f5f5f5;
   }
 
   .mp-dropdown-trigger {
     width: 100%;
-    padding: 14px 0;
     display: flex;
     justify-content: space-between;
+    padding: 14px 0;
   }
 
   .mp-nav-dropdown-content {
     position: static;
     box-shadow: none;
     border: none;
-    background: #f9f9f9;
     width: 100%;
-    display: none;
-    border-radius: 10px;
+    background: #f7f7f7;
+    padding: 6px;
     margin: 0 0 12px 0;
-    overflow: hidden;
+    border-radius: 10px;
+    display: none;
+    box-sizing: border-box;
   }
 
   .mp-nav-dropdown-content.show {
@@ -315,16 +320,11 @@
   }
 
   .mp-nav-dropdown-content a {
-    padding: 12px 14px;
+    padding: 12px 10px;
   }
 
-  .mp-navbar-btn-primary {
-    text-align: center;
-    margin-top: 14px;
-    border-bottom: none;
-  }
   .mp-logout-link {
-    color: red;
+    color: #d40000;
     background: none;
     border: none;
     font: inherit;
@@ -332,10 +332,62 @@
   }
 }
 
-/* Loader */
+/* ===== Loader ===== */
 .loader-box {
   height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+/* =========================================================
+   UPGRADE BUTTON — FIXED ALIGNMENT (dropdown + mobile)
+   ========================================================= */
+
+/* Base highlight */
+.upgrade-btn {
+  background: rgba(255, 149, 0, 0.18);
+  border: 1px solid rgba(255, 149, 0, 0.35);
+  color: #7a3d00;
+  font-weight: 700;
+}
+
+/* Dropdown: force proper spacing text-left + badge-right */
+.mp-dropdown-menu a.mp-upgrade-dropdown-link {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between !important;
+  padding: 10px 12px !important;
+  margin: 2px 0;
+}
+
+/* Right badge (if you use <span class="mp-upgrade-meta">) */
+.mp-upgrade-meta {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 149, 0, 0.22);
+  border: 1px solid rgba(255, 149, 0, 0.35);
+  color: #7a3d00;
+  white-space: nowrap;
+}
+
+/* Hover */
+.mp-dropdown-menu a.mp-upgrade-dropdown-link.upgrade-btn:hover {
+  background: rgba(255, 149, 0, 0.28);
+}
+
+/* Mobile: inset the upgrade button so it doesn't stick to the left edge */
+@media (max-width: 992px) {
+  .mp-navbar-links-wrapper a.mp-upgrade-link.upgrade-btn {
+    width: 100%;
+    box-sizing: border-box;
+    display: block;
+    padding: 12px 12px !important; /* ✅ adds left/right inset */
+    margin: 8px 0; /* ✅ spacing */
+    border-radius: 12px;
+    border-bottom: none !important; /* ✅ remove drawer divider line */
+  }
 }

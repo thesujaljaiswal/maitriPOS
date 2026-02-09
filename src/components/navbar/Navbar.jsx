@@ -68,6 +68,41 @@ export default function NavbarLayout() {
     if (!isMobile) closeMenu();
   }, [isMobile, closeMenu]);
 
+  // ✅ expiry info: show hours/min if < 24h, else days; null if expired/none
+  const getExpiryInfo = useCallback((expiresAt) => {
+    if (!expiresAt) return null;
+
+    const exp = new Date(expiresAt);
+    if (Number.isNaN(exp.getTime())) return null;
+
+    const diffMs = exp.getTime() - Date.now();
+    if (diffMs <= 0) return null; // expired -> don't show
+
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    if (diffHours < 24) {
+      const hours = Math.floor(diffHours);
+      const minutes = Math.floor((diffHours - hours) * 60);
+      return { type: "hours", hours, minutes };
+    }
+
+    const days = Math.ceil(diffHours / 24);
+    return { type: "days", days };
+  }, []);
+
+  const expiryInfo = getExpiryInfo(planExpiresAt);
+
+  // ✅ show Upgrade CTA only inside dropdown AND mobile menu:
+  // - always show for ARAMBH
+  // - for paid plans show only when close to expiry:
+  //   <24h OR <=3 days (and not expired)
+  const showUpgradeCta =
+    isAuthenticated &&
+    (plan === "ARAMBH" ||
+      (expiryInfo &&
+        (expiryInfo.type === "hours" ||
+          (expiryInfo.type === "days" && expiryInfo.days <= 3))));
+
   const checkStatus = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -170,6 +205,25 @@ export default function NavbarLayout() {
       </div>
     );
 
+  // ✅ label for UI (days vs hours)
+  const expiryLabel =
+    plan === "ARAMBH"
+      ? ""
+      : expiryInfo?.type === "hours"
+        ? `(${expiryInfo.hours}h ${expiryInfo.minutes}m left)`
+        : expiryInfo?.type === "days"
+          ? `(${expiryInfo.days}d left)`
+          : "";
+
+  const expiryBadge =
+    plan === "ARAMBH"
+      ? "🚀"
+      : expiryInfo?.type === "hours"
+        ? `${expiryInfo.hours}h ${expiryInfo.minutes}m`
+        : expiryInfo?.type === "days"
+          ? `${expiryInfo.days}d left`
+          : "🚀";
+
   return (
     <div className="mp-app-wrapper">
       <nav className="mp-navbar-root">
@@ -188,7 +242,9 @@ export default function NavbarLayout() {
 
             {/* Links */}
             <div
-              className={`mp-navbar-links-wrapper ${isMobileMenuOpen ? "active" : ""}`}
+              className={`mp-navbar-links-wrapper ${
+                isMobileMenuOpen ? "active" : ""
+              }`}
             >
               <NavLink to="/" className={navClass} onClick={closeMenu}>
                 Home
@@ -216,6 +272,7 @@ export default function NavbarLayout() {
                       Open Store ↗
                     </a>
                   ) : null}
+
                   <div
                     className="mp-nav-dropdown"
                     onMouseEnter={onProductEnter}
@@ -242,6 +299,7 @@ export default function NavbarLayout() {
                       </Link>
                     </div>
                   </div>
+
                   {(plan === "PRAVAH" || plan === "UTSAH") && (
                     <div
                       className="mp-nav-dropdown"
@@ -261,21 +319,15 @@ export default function NavbarLayout() {
                           isBusinessOpen ? "show" : ""
                         }`}
                       >
-                        {(plan === "PRAVAH" || plan === "UTSAH") && (
-                          <Link to="/orders" onClick={closeMenu}>
-                            Manage Orders
-                          </Link>
-                        )}
-                        {(plan === "PRAVAH" || plan === "UTSAH") && (
-                          <Link to="/track/expense" onClick={closeMenu}>
-                            Expense tracker
-                          </Link>
-                        )}
-                        {(plan === "PRAVAH" || plan === "UTSAH") && (
-                          <Link to="/analytics" onClick={closeMenu}>
-                            Analytics
-                          </Link>
-                        )}
+                        <Link to="/orders" onClick={closeMenu}>
+                          Manage Orders
+                        </Link>
+                        <Link to="/track/expense" onClick={closeMenu}>
+                          Expense tracker
+                        </Link>
+                        <Link to="/analytics" onClick={closeMenu}>
+                          Analytics
+                        </Link>
                       </div>
                     </div>
                   )}
@@ -283,6 +335,16 @@ export default function NavbarLayout() {
                   {/* Mobile profile + logout inside menu */}
                   {isMobile ? (
                     <>
+                      {showUpgradeCta ? (
+                        <Link
+                          to="/upgrade"
+                          onClick={closeMenu}
+                          className="mp-navbar-link mp-upgrade-link upgrade-btn"
+                        >
+                          Upgrade {expiryLabel}
+                        </Link>
+                      ) : null}
+
                       <NavLink
                         to="/account"
                         className={navClass}
@@ -340,6 +402,18 @@ export default function NavbarLayout() {
                       <Link to="/account" onClick={closeMenu}>
                         My Profile
                       </Link>
+
+                      {showUpgradeCta ? (
+                        <Link
+                          to="/upgrade"
+                          onClick={closeMenu}
+                          className="mp-upgrade-dropdown-link upgrade-btn"
+                        >
+                          <span className="mp-upgrade-title">Upgrade Plan</span>
+                          <span className="mp-upgrade-meta">{expiryBadge}</span>
+                        </Link>
+                      ) : null}
+
                       <button
                         type="button"
                         onClick={handleLogout}

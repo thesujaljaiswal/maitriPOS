@@ -5,6 +5,7 @@ import NavbarLayout from "../navbar/Navbar";
 
 export default function Account() {
   const navigate = useNavigate();
+
   const [user, setUser] = useState({
     fullName: "",
     username: "",
@@ -13,36 +14,77 @@ export default function Account() {
     plan: "",
     planExpiresAt: "",
   });
+
   const [passwordData, setPasswordData] = useState({
     oldPassword: "",
     newPassword: "",
   });
+
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
-  // Helper to format the date
+  // ✅ tick forces re-render so countdown updates without refresh
+  const [tick, setTick] = useState(0);
+
+  // ✅ format date + time
   const formatDate = (dateString) => {
     if (!dateString || dateString === "FREE PLAN") return "N/A (Free Tier)";
+
     const date = new Date(dateString);
-    return isNaN(date.getTime())
-      ? dateString
-      : date.toLocaleDateString("en-US", {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        });
+    if (isNaN(date.getTime())) return dateString;
+
+    return date.toLocaleString("en-IN", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
+
+  // ✅ expiry info: show hours/min if < 24h, else show days; hide if expired
+  const getExpiryInfo = (expiresAt) => {
+    if (!expiresAt || expiresAt === "FREE PLAN") return null;
+
+    const exp = new Date(expiresAt);
+    if (isNaN(exp.getTime())) return null;
+
+    const diffMs = exp.getTime() - Date.now();
+    if (diffMs <= 0) return null; // ❌ expired -> don't show
+
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    // ⏰ Less than 24 hours → show hours + minutes
+    if (diffHours < 24) {
+      const hours = Math.floor(diffHours);
+      const minutes = Math.floor((diffHours - hours) * 60);
+
+      return { type: "hours", hours, minutes };
+    }
+
+    // 📅 24+ hours → show days
+    const days = Math.ceil(diffHours / 24);
+    return { type: "days", days };
+  };
+
+  // ✅ computed on every render (tick triggers render)
+  const expiryInfo = getExpiryInfo(user.planExpiresAt);
+
+  // ✅ show alert only for paid plans and only if not expired
+  const showSubscriptionAlert =
+    user.plan && user.plan !== "ARAMBH" && expiryInfo !== null;
 
   const fetchUserData = async () => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/current-user`,
-        {
-          credentials: "include",
-        },
+        { credentials: "include" },
       );
+
       const result = await res.json();
+
       if (result.success) {
         setUser({
           fullName: result.data.fullName || "",
@@ -64,10 +106,33 @@ export default function Account() {
     fetchUserData();
   }, []);
 
+  // ✅ auto update countdown every 30 seconds (stops when no expiry / expired)
+  useEffect(() => {
+    if (!user.planExpiresAt || user.planExpiresAt === "FREE PLAN") return;
+
+    const exp = new Date(user.planExpiresAt);
+    if (isNaN(exp.getTime())) return;
+
+    // if already expired, no need to run timer
+    if (exp.getTime() <= Date.now()) return;
+
+    const interval = setInterval(() => {
+      // if expired now, stop timer
+      if (new Date(user.planExpiresAt).getTime() <= Date.now()) {
+        clearInterval(interval);
+        return;
+      }
+      setTick((t) => t + 1);
+    }, 30 * 1000); // update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [user.planExpiresAt]);
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage({ type: "", text: "" });
+
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/update-account`,
@@ -78,7 +143,9 @@ export default function Account() {
           credentials: "include",
         },
       );
+
       const result = await res.json();
+
       setMessage({
         type: result.success ? "success" : "error",
         text: result.message || "Profile updated!",
@@ -93,6 +160,7 @@ export default function Account() {
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/change-password`,
@@ -103,7 +171,9 @@ export default function Account() {
           credentials: "include",
         },
       );
+
       const result = await res.json();
+
       if (result.success) {
         setPasswordData({ oldPassword: "", newPassword: "" });
         setIsModalOpen(false);
@@ -121,6 +191,7 @@ export default function Account() {
   return (
     <>
       <NavbarLayout />
+
       <div className="mp-account-page-wrapper">
         <header className="mp-account-header">
           <div className="mp-header-flex">
@@ -141,19 +212,43 @@ export default function Account() {
           <div className={`mp-alert ${message.type}`}>{message.text}</div>
         )}
 
+        {/* 🔴 Subscription warning (auto-updates) */}
+        {showSubscriptionAlert && (
+          <div className="mp-alert danger">
+            ⚠️ Your <b>{user.plan}</b> plan expires{" "}
+            {expiryInfo.type === "hours" ? (
+              <>
+                in{" "}
+                <b>
+                  {expiryInfo.hours}h {expiryInfo.minutes}m
+                </b>
+              </>
+            ) : (
+              <>
+                in <b>{expiryInfo.days}</b> day
+                {expiryInfo.days !== 1 ? "s" : ""}
+              </>
+            )}
+            . Please Renew now to have a smooth business experience..
+          </div>
+        )}
+
         <div className="mp-account-single-card">
           <div className="mp-form-group">
             <label>
               Current Plan: <b>{user.plan || "N/A"}</b>
             </label>
           </div>
+
           <div className="mp-form-group">
             <label>
               Expires On: <b>{formatDate(user.planExpiresAt)}</b>
             </label>
           </div>
+
           <section className="mp-account-card">
             <h3>Profile Details</h3>
+
             <form onSubmit={handleUpdateProfile}>
               <div className="mp-form-group">
                 <label>Full Name</label>
@@ -166,18 +261,12 @@ export default function Account() {
                   required
                 />
               </div>
+
               <div className="mp-form-group">
                 <label>Username</label>
-                <input
-                  disabled
-                  type="text"
-                  value={user.username}
-                  onChange={(e) =>
-                    setUser({ ...user, username: e.target.value })
-                  }
-                  required
-                />
+                <input type="text" value={user.username} disabled />
               </div>
+
               <div className="mp-form-group">
                 <label>Email Address</label>
                 <input
@@ -187,6 +276,7 @@ export default function Account() {
                   required
                 />
               </div>
+
               <div className="mp-form-group">
                 <label>Phone Number</label>
                 <input
@@ -216,6 +306,7 @@ export default function Account() {
                 &times;
               </button>
             </div>
+
             <form onSubmit={handleChangePassword}>
               <div className="mp-form-group">
                 <label>Current Password</label>
@@ -231,6 +322,7 @@ export default function Account() {
                   required
                 />
               </div>
+
               <div className="mp-form-group">
                 <label>New Password</label>
                 <input
@@ -245,6 +337,7 @@ export default function Account() {
                   required
                 />
               </div>
+
               <button type="submit" className="mp-btn-save" disabled={loading}>
                 {loading ? "Processing..." : "Update Password"}
               </button>

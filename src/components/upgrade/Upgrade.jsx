@@ -8,6 +8,9 @@ export default function Upgrade() {
   const [loading, setLoading] = useState(false);
   const hasRedirectedRef = React.useRef(false);
 
+  // ✅ tick forces re-render so countdown updates without refresh
+  const [tick, setTick] = useState(0);
+
   useEffect(() => {
     const fetchUser = async () => {
       if (hasRedirectedRef.current) return;
@@ -34,11 +37,12 @@ export default function Upgrade() {
 
       if (plan === "ARAMBH") allow = true;
 
+      // ✅ allow when within 7 days OR within 24 hours (hours will show)
       if (plan === "PRAVAH" && planExpiresAt) {
         const remainingDays =
           (new Date(planExpiresAt) - new Date()) / (1000 * 60 * 60 * 24);
 
-        if (remainingDays <= 7) allow = true;
+        if (remainingDays <= 7 && remainingDays > 0) allow = true;
       }
 
       if (!allow) {
@@ -56,7 +60,51 @@ export default function Upgrade() {
     fetchUser();
   }, [navigate]);
 
-  // 🔹 Load Razorpay script
+  // ✅ expiry info: show hours/min if < 24h, else show days; null if expired/none
+  const getExpiryInfo = (expiresAt) => {
+    if (!expiresAt) return null;
+
+    const exp = new Date(expiresAt);
+    if (isNaN(exp.getTime())) return null;
+
+    const diffMs = exp.getTime() - Date.now();
+    if (diffMs <= 0) return null; // expired -> don't show
+
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    if (diffHours < 24) {
+      const hours = Math.floor(diffHours);
+      const minutes = Math.floor((diffHours - hours) * 60);
+      return { type: "hours", hours, minutes };
+    }
+
+    const days = Math.ceil(diffHours / 24);
+    return { type: "days", days };
+  };
+
+  // ✅ computed on every render (tick triggers render)
+  const expiryInfo = getExpiryInfo(user?.planExpiresAt);
+
+  // ✅ auto update countdown every 30 seconds (stops when expired)
+  useEffect(() => {
+    if (!user?.planExpiresAt) return;
+
+    const exp = new Date(user.planExpiresAt);
+    if (isNaN(exp.getTime())) return;
+    if (exp.getTime() <= Date.now()) return;
+
+    const interval = setInterval(() => {
+      if (new Date(user.planExpiresAt).getTime() <= Date.now()) {
+        clearInterval(interval);
+        return;
+      }
+      setTick((t) => t + 1);
+    }, 30 * 1000);
+
+    return () => clearInterval(interval);
+  }, [user?.planExpiresAt]);
+
+  // 🔹 Razorpay loader
   const loadRazorpay = () => {
     return new Promise((resolve) => {
       const script = document.createElement("script");
@@ -67,7 +115,6 @@ export default function Upgrade() {
     });
   };
 
-  // 🔹 Start payment
   const handleUpgrade = async () => {
     setLoading(true);
 
@@ -78,16 +125,13 @@ export default function Upgrade() {
       return;
     }
 
-    // 1️⃣ Create order from backend
     const res = await fetch(
       `${import.meta.env.VITE_API_BASE_URL}/subscription/pravah/create-order`,
       {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          plan: "PRAVAH",
-        }),
+        body: JSON.stringify({ plan: "PRAVAH" }),
       },
     );
 
@@ -99,7 +143,6 @@ export default function Upgrade() {
       return;
     }
 
-    // 2️⃣ Razorpay checkout
     const options = {
       key: import.meta.env.VITE_RAZORPAY_KEY_ID,
       amount: order.data.amount,
@@ -107,31 +150,20 @@ export default function Upgrade() {
       name: "maitriPOS™",
       description: "Pravah Plan (30 Days)",
       order_id: order.data.id,
-
-      handler: function () {
-        // ⚠️ DO NOTHING HERE
-        // Webhook will activate plan
-        navigate("/");
-      },
-
+      handler: () => navigate("/"),
       prefill: {
         name: user?.fullName,
         email: user?.email,
       },
-
       notes: {
         userId: user?._id,
         plan: "PRAVAH",
       },
-
-      theme: {
-        color: "#ffd700",
-      },
+      theme: { color: "#ffd700" },
     };
 
     const rzp = new window.Razorpay(options);
     rzp.open();
-
     setLoading(false);
   };
 
@@ -140,12 +172,40 @@ export default function Upgrade() {
   return (
     <>
       <NavbarLayout />
+
       <div style={{ maxWidth: "800px", margin: "60px auto", padding: "20px" }}>
         <h1>Upgrade Your Plan 🚀</h1>
 
         <p style={{ marginTop: "10px", color: "#555" }}>
           Current Plan: <strong>{user.plan}</strong>
         </p>
+
+        {/* 🔴 PLAN EXPIRY WARNING (auto-updates + hours if <24h; hidden if expired) */}
+        {user.plan !== "ARAMBH" && expiryInfo && (
+          <p
+            style={{
+              marginTop: "8px",
+              color: "#c62828",
+              fontWeight: 600,
+            }}
+          >
+            ⚠️ Your plan is expiring{" "}
+            {expiryInfo.type === "hours" ? (
+              <>
+                in{" "}
+                <b>
+                  {expiryInfo.hours}h {expiryInfo.minutes}m
+                </b>
+              </>
+            ) : (
+              <>
+                in <b>{expiryInfo.days}</b> day
+                {expiryInfo.days !== 1 ? "s" : ""}
+              </>
+            )}
+            . Renew now to have a smooth business experience.
+          </p>
+        )}
 
         <div
           style={{
@@ -158,9 +218,10 @@ export default function Upgrade() {
           <h2>PRAVAH Plan</h2>
 
           <ul style={{ marginTop: "15px", lineHeight: "1.8" }}>
-            <li>✅ Unlimited Orders</li>
             <li>✅ QR Digital Menu</li>
-            <li>✅ Customer Analytics</li>
+            <li>✅ Unlimited Orders</li>
+            <li>✅ Personalized Analytics</li>
+            <li>✅ Expense Tracker</li>
             <li>✅ Priority Support</li>
           </ul>
 
