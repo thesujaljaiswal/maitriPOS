@@ -25,7 +25,7 @@ export default function NavbarLayout() {
   const isMounted = useRef(true);
   const dropdownRef = useRef(null);
 
-  // ✅ reactive mobile detection (fixes the "window.innerWidth" bug)
+  // ✅ reactive mobile detection
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 992);
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 992);
@@ -55,7 +55,7 @@ export default function NavbarLayout() {
     document.body.style.overflow = isMobileMenuOpen ? "hidden" : "auto";
   }, [isMobileMenuOpen]);
 
-  // ✅ close menus when route changes by clicking links
+  // ✅ close menus
   const closeMenu = useCallback(() => {
     setIsMobileMenuOpen(false);
     setIsDropdownOpen(false);
@@ -63,7 +63,6 @@ export default function NavbarLayout() {
     setIsBusinessOpen(false);
   }, []);
 
-  // ✅ when switching to desktop, force-close mobile overlay + dropdowns
   useEffect(() => {
     if (!isMobile) closeMenu();
   }, [isMobile, closeMenu]);
@@ -92,16 +91,16 @@ export default function NavbarLayout() {
 
   const expiryInfo = getExpiryInfo(planExpiresAt);
 
-  // ✅ show Upgrade CTA only inside dropdown AND mobile menu:
+  // ✅ show Upgrade CTA:
   // - always show for ARAMBH
-  // - for paid plans show only when close to expiry:
-  //   <24h OR <=3 days (and not expired)
+  // - for paid plans show when:
+  //   <24h OR <= 7 days (and not expired)
   const showUpgradeCta =
     isAuthenticated &&
     (plan === "ARAMBH" ||
       (expiryInfo &&
         (expiryInfo.type === "hours" ||
-          (expiryInfo.type === "days" && expiryInfo.days <= 3))));
+          (expiryInfo.type === "days" && expiryInfo.days <= 7))));
 
   const checkStatus = useCallback(async () => {
     try {
@@ -194,7 +193,6 @@ export default function NavbarLayout() {
     if (isMobile) setIsBusinessOpen((p) => !p);
   };
 
-  // ✅ use NavLink className fn for active style
   const navClass = ({ isActive }) =>
     `mp-navbar-link ${isActive ? "mp-navbar-link--active" : ""}`;
 
@@ -205,7 +203,6 @@ export default function NavbarLayout() {
       </div>
     );
 
-  // ✅ label for UI (days vs hours)
   const expiryLabel =
     plan === "ARAMBH"
       ? ""
@@ -234,13 +231,11 @@ export default function NavbarLayout() {
           </Link>
 
           <div className="mp-nav-right-section">
-            {/* Overlay (only when menu open on mobile) */}
             <div
               className={`mp-mobile-overlay ${isMobileMenuOpen ? "show" : ""}`}
               onClick={closeMenu}
             />
 
-            {/* Links */}
             <div
               className={`mp-navbar-links-wrapper ${
                 isMobileMenuOpen ? "active" : ""
@@ -260,7 +255,6 @@ export default function NavbarLayout() {
                     {hasStore ? "Store Settings" : "Setup Store"}
                   </NavLink>
 
-                  {/* Optional quick link to public store */}
                   {hasStore && storeSlug ? (
                     <a
                       className="mp-navbar-link mp-visit-store"
@@ -332,7 +326,6 @@ export default function NavbarLayout() {
                     </div>
                   )}
 
-                  {/* Mobile profile + logout inside menu */}
                   {isMobile ? (
                     <>
                       {showUpgradeCta ? (
@@ -384,7 +377,6 @@ export default function NavbarLayout() {
               )}
             </div>
 
-            {/* Right icons */}
             <div className="mp-navbar-icons-group" ref={dropdownRef}>
               {isAuthenticated && !isMobile && (
                 <div className="mp-dropdown-container">
