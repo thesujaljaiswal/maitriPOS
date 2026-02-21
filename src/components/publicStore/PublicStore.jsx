@@ -20,12 +20,72 @@ const PublicStore = ({ slug }) => {
     );
   }, []);
 
+  /* =============================
+     FORCE GOOGLE TRANSLATE RESET
+     ============================= */
+  const forceEnglish = () => {
+    const host = window.location.hostname;
+
+    // clear previous cookie
+    document.cookie =
+      "googtrans=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+    document.cookie =
+      `googtrans=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${host}`;
+
+    // set to english
+    document.cookie = "googtrans=/en/en;path=/";
+    document.cookie = `googtrans=/en/en;path=/;domain=${host}`;
+  };
+
+  /* =============================
+     GOOGLE TRANSLATE TRIGGER
+     ============================= */
+  const applyGoogleLang = useCallback((code, tries = 0) => {
+    const combo = document.querySelector(".goog-te-combo");
+
+    if (!combo) {
+      if (tries < 20) setTimeout(() => applyGoogleLang(code, tries + 1), 200);
+      return;
+    }
+
+    combo.value = code;
+    combo.dispatchEvent(new Event("change"));
+  }, []);
+
+  /* =============================
+     LOAD GOOGLE SCRIPT
+     ============================= */
+  useEffect(() => {
+    forceEnglish(); // ⭐ ALWAYS RESET COOKIE ON LOAD
+
+    if (document.getElementById("google-translate-script")) return;
+
+    window.googleTranslateElementInit = () => {
+      new window.google.translate.TranslateElement(
+        { pageLanguage: "en", autoDisplay: false },
+        "google_translate_element"
+      );
+
+      applyGoogleLang("en"); // ⭐ FORCE ENGLISH
+    };
+
+    const script = document.createElement("script");
+    script.id = "google-translate-script";
+    script.src =
+      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    document.body.appendChild(script);
+  }, [applyGoogleLang]);
+
+  /* =============================
+     FETCH STORE DATA
+     ============================= */
   const fetchStore = useCallback(async () => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`
       );
       if (!res.ok) throw new Error("Store not found");
+
       const data = await res.json();
       const store = data.data;
 
@@ -43,18 +103,7 @@ const PublicStore = ({ slug }) => {
       setOpenSubCats(initialSubCats);
 
       document.title = store.store.name;
-
-      const logoUrl = store.store.logo;
-      if (logoUrl) {
-        let link = document.querySelector("link[rel~='icon']");
-        if (!link) {
-          link = document.createElement("link");
-          link.rel = "icon";
-          document.head.appendChild(link);
-        }
-        link.href = logoUrl;
-      }
-    } catch (err) {
+    } catch {
       setError("Store not found");
     }
   }, [slug]);
@@ -63,6 +112,9 @@ const PublicStore = ({ slug }) => {
     fetchStore();
   }, [fetchStore]);
 
+  /* =============================
+     UI HANDLERS
+     ============================= */
   const toggleAccordion = (id) =>
     setOpenSubCats((p) => ({ ...p, [id]: !p[id] }));
 
@@ -72,40 +124,15 @@ const PublicStore = ({ slug }) => {
     if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
   };
 
-  // ⭐ Google Translate trigger
-  const applyGoogleLang = useCallback((code, tries = 0) => {
-    const combo = document.querySelector(".goog-te-combo");
-    if (!combo) {
-      if (tries < 15) setTimeout(() => applyGoogleLang(code, tries + 1), 200);
-      return;
-    }
-    combo.value = code;
-    combo.dispatchEvent(new Event("change"));
-  }, []);
-
-  useEffect(() => {
-    if (document.getElementById("google-translate-script")) return;
-
-    window.googleTranslateElementInit = () => {
-      new window.google.translate.TranslateElement(
-        { pageLanguage: "en", autoDisplay: false },
-        "google_translate_element"
-      );
-    };
-
-    const script = document.createElement("script");
-    script.id = "google-translate-script";
-    script.src =
-      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-    document.body.appendChild(script);
-  }, []);
-
   const onChangeLang = (e) => {
     const code = e.target.value;
     setLang(code);
     applyGoogleLang(code);
   };
 
+  /* =============================
+     STATES
+     ============================= */
   if (error)
     return (
       <div className="ps-status">
@@ -122,18 +149,19 @@ const PublicStore = ({ slug }) => {
 
   const { store, categories } = storeData;
 
+  /* =============================
+     JSX
+     ============================= */
   return (
     <div className="ps-wrapper">
       <div id="google_translate_element" className="ps-gt-hidden" />
 
+      {/* HEADER */}
       <header className="ps-hero">
         <div className="ps-hero-inner">
-          {/* LANGUAGE SELECTOR */}
           <div className="ps-hero-top">
             <div className="ps-lang-wrap notranslate" translate="no">
-              <span className="ps-lang-chip notranslate" translate="no">
-                🌐 Language
-              </span>
+              <span className="ps-lang-chip">🌐 Language</span>
 
               <select
                 className="ps-lang-select notranslate"
@@ -159,11 +187,6 @@ const PublicStore = ({ slug }) => {
 
           <h1 className="ps-title">{store.name}</h1>
           <p className="ps-addr">{store.address}</p>
-
-          <div className="ps-links">
-            <a href={`tel:${store.contact.phone}`}>📞 {store.contact.phone}</a>
-            <a href={`mailto:${store.contact.email}`}>✉️ Email Us</a>
-          </div>
         </div>
       </header>
 
@@ -203,78 +226,24 @@ const PublicStore = ({ slug }) => {
                   className="ps-acc-head"
                   onClick={() => toggleAccordion(sub._id)}
                 >
-                  <div>
-                    <span className="ps-acc-name">{sub.name}</span>
-                    <span className="ps-acc-count">
-                      {sub.items?.length} items
-                    </span>
-                  </div>
-                  <span className="ps-chevron">↓</span>
+                  <span className="ps-acc-name">{sub.name}</span>
                 </div>
 
-                <div className="ps-acc-content">
-                  <div className="ps-acc-inner">
-                    <div className="ps-grid">
-                      {sub.items?.map((item) => (
-                        <ProductCard
-                          key={item._id}
-                          item={item}
-                          onOpen={setSelectedItem}
-                          store={store}
-                        />
-                      ))}
-                    </div>
-                  </div>
+                <div className="ps-grid">
+                  {sub.items?.map((item) => (
+                    <ProductCard
+                      key={item._id}
+                      item={item}
+                      onOpen={setSelectedItem}
+                      store={store}
+                    />
+                  ))}
                 </div>
               </div>
             ))}
           </section>
         ))}
       </main>
-
-      {/* FOOTER */}
-      <footer className="ps-footer">
-        <p className="ps-powered-by">
-          Powered by{" "}
-          <a href="https://maitripos.com" target="_blank" rel="noreferrer">
-            maitriPOS.com
-          </a>
-        </p>
-      </footer>
-
-      {/* MODAL */}
-      {selectedItem && (
-        <div className="ps-modal-overlay" onClick={() => setSelectedItem(null)}>
-          <div className="ps-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ps-modal-grid">
-              <div className="ps-modal-img">
-                <img src={selectedItem.image} alt={selectedItem.name} />
-                <button
-                  className="ps-close-btn"
-                  onClick={() => setSelectedItem(null)}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <div className="ps-modal-info">
-                <div className="ps-modal-header">
-                  <h3>{selectedItem.name}</h3>
-                  <span className="ps-modal-price">
-                    ₹
-                    {selectedItem.price ||
-                      Math.min(...selectedItem.variants.map((v) => v.price))}
-                  </span>
-                </div>
-
-                <p className="ps-modal-desc">
-                  {selectedItem.description || "No description available."}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -288,23 +257,10 @@ const ProductCard = memo(({ item, onOpen, store }) => {
       : 0);
 
   return (
-    <div
-      className={`ps-card ${!item.isAvailable ? "ps-oos" : ""}`}
-      onClick={() => onOpen(item)}
-    >
-      <div className="ps-card-img">
-        <img src={item.image || store.logo} alt={item.name} loading="lazy" />
-      </div>
-
-      <div className="ps-card-body">
-        <h4>{item.name}</h4>
-        <div className="ps-card-foot">
-          <span className="ps-price">
-            ₹{price}
-            {item.variants?.length > 0 ? " onwards" : ""}
-          </span>
-        </div>
-      </div>
+    <div className="ps-card" onClick={() => onOpen(item)}>
+      <img src={item.image || store.logo} alt={item.name} />
+      <h4>{item.name}</h4>
+      <span>₹{price}</span>
     </div>
   );
 });
