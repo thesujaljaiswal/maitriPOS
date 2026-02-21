@@ -1,4 +1,3 @@
-// PublicStore.jsx  (language.json is in SAME folder)
 import { useEffect, useState, useRef, useCallback, memo, useMemo } from "react";
 import logo from "../../assets/maitriPOS ICON 2.jpg";
 import "./style.css";
@@ -36,7 +35,8 @@ const PublicStore = ({ slug }) => {
 
       setStoreData(store);
 
-      if (store.categories?.length > 0) setActiveCategory(store.categories[0]._id);
+      if (store.categories?.length > 0)
+        setActiveCategory(store.categories[0]._id);
 
       const initialSubCats = {};
       store.categories.forEach((cat) => {
@@ -140,15 +140,32 @@ const PublicStore = ({ slug }) => {
         <div className="ps-hero-inner">
           {/* ✅ Top bar */}
           <div className="ps-hero-top">
-            <div className="ps-lang-wrap" aria-label="Language selector">
-              <span className="ps-lang-chip">🌐 Language</span>
+            {/* ✅ Prevent translation of selector itself */}
+            <div
+              className="ps-lang-wrap notranslate"
+              aria-label="Language selector"
+              translate="no"
+            >
+              <span
+                className="ps-lang-chip notranslate"
+                translate="no"
+              >
+                🌐 Language
+              </span>
+
               <select
-                className="ps-lang-select"
+                className="ps-lang-select notranslate"
+                translate="no"
                 value={lang}
                 onChange={onChangeLang}
               >
                 {sortedLangs.map((l) => (
-                  <option key={l.code} value={l.code}>
+                  <option
+                    key={l.code}
+                    value={l.code}
+                    className="notranslate"
+                    translate="no"
+                  >
                     {l.label}
                   </option>
                 ))}
