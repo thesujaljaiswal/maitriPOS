@@ -1,6 +1,7 @@
 /* style.css (NO global body/:root styling — only classnames) */
 
 /* ✅ Hide Google translate top banner frame (still needed, but scoped to their class) */
+.notranslate { translate: no; }
 .goog-te-banner-frame {
   display: none !important;
 }
