@@ -24,17 +24,59 @@ const PublicStore = ({ slug }) => {
     const list = Array.isArray(LANGS) ? [...LANGS] : [];
     const hasEn = list.some((l) => l?.code === "en");
     if (!hasEn) list.push({ code: "en", label: "English" });
-
-    const en = list.find((l) => l?.code === "en") || { code: "en", label: "English" };
+    const en = list.find((l) => l?.code === "en");
     const rest = list
       .filter((l) => l?.code && l.code !== "en")
       .sort((a, b) => (a.label || "").localeCompare(b.label || "", "en", { sensitivity: "base" }));
-
     return [en, ...rest];
   }, []);
 
   const allowedLangCodes = useMemo(() => new Set(langsFinal.map((l) => l.code)), [langsFinal]);
-  const [lang, setLang] = useState("en");
+
+  // Helper to read current language from cookie
+  const getLangFromCookie = useCallback(() => {
+    const match = document.cookie.match(/googtrans=\/en\/([^;]+)/);
+    if (match && match[1] && allowedLangCodes.has(match[1])) return match[1];
+    return "en";
+  }, [allowedLangCodes]);
+
+  const [lang, setLang] = useState(getLangFromCookie());
+
+  const getCookieDomains = useCallback(() => {
+    const host = window.location.hostname;
+    const parts = host.split(".").filter(Boolean);
+    let root = host;
+    if (parts.length >= 2) root = `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
+    return [host, root, `.${root}`];
+  }, []);
+
+  const setSessionCookie = useCallback((code) => {
+    try {
+      const domains = getCookieDomains();
+      const expirePast = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      // Clear all existing variations first
+      domains.forEach((d) => {
+        document.cookie = `googtrans=; ${expirePast}; path=/; domain=${d}`;
+      });
+      document.cookie = `googtrans=; ${expirePast}; path=/`;
+      // Set new Session Cookie (No expires/max-age means delete on tab close)
+      document.cookie = `googtrans=/en/${code}; path=/`;
+    } catch (e) {}
+  }, [getCookieDomains]);
+
+  const applyGoogleLang = useCallback((code, tries = 0) => {
+    try {
+      const combo = document.querySelector(".goog-te-combo");
+      if (!combo) {
+        if (tries < 30) setTimeout(() => applyGoogleLang(code, tries + 1), 150);
+        return;
+      }
+      if (combo.value !== code) {
+        combo.value = code;
+        combo.dispatchEvent(new Event("change"));
+      }
+    } catch (e) {}
+  }, []);
 
   useLayoutEffect(() => {
     try {
@@ -48,56 +90,12 @@ const PublicStore = ({ slug }) => {
     } catch (e) {}
   }, []);
 
-  const getCookieDomains = useCallback(() => {
-    const host = window.location.hostname;
-    const parts = host.split(".").filter(Boolean);
-    let root = host;
-    if (parts.length >= 2) root = `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
-    return [host, root, `.${root}`];
-  }, []);
-
-  const resetGoogTransToEnglish = useCallback(() => {
-    try {
-      const domains = getCookieDomains();
-      const expirePast = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
-      
-      // 1. Force clear existing persisted cookies
-      domains.forEach((d) => {
-        document.cookie = `googtrans=; ${expirePast}; path=/; domain=${d}`;
-      });
-      document.cookie = `googtrans=; ${expirePast}; path=/`;
-
-      // 2. Set as SESSION COOKIE (No 'expires' or 'max-age' attribute)
-      // This ensures the cookie dies when the tab/browser is closed.
-      document.cookie = "googtrans=/en/en; path=/";
-    } catch (e) {}
-  }, [getCookieDomains]);
-
-  const applyGoogleLang = useCallback((code, tries = 0) => {
-    try {
-      const combo = document.querySelector(".goog-te-combo");
-      if (!combo) {
-        if (tries < 30) setTimeout(() => applyGoogleLang(code, tries + 1), 150);
-        return;
-      }
-      combo.value = code;
-      combo.dispatchEvent(new Event("change"));
-    } catch (e) {}
-  }, []);
-
   useEffect(() => {
-    if (lang === "en") resetGoogTransToEnglish();
-
     window.googleTranslateElementInit = () => {
       new window.google.translate.TranslateElement(
-        { 
-          pageLanguage: "en", 
-          autoDisplay: false, 
-          includedLanguages: Array.from(allowedLangCodes).join(',') 
-        },
+        { pageLanguage: "en", autoDisplay: false, includedLanguages: Array.from(allowedLangCodes).join(',') },
         "google_translate_element"
       );
-      if (lang === "en") resetGoogTransToEnglish();
       applyGoogleLang(lang);
     };
 
@@ -108,53 +106,38 @@ const PublicStore = ({ slug }) => {
       document.body.appendChild(script);
     }
 
-    // Cleanup: Clear translation cookies when user leaves the page component
     return () => {
-        const domains = getCookieDomains();
-        const expire = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        domains.forEach((d) => {
-          document.cookie = `googtrans=; ${expire}; path=/; domain=${d}`;
-        });
-        document.cookie = `googtrans=; ${expire}; path=/`;
+      // Final cleanup when component unmounts
+      const domains = getCookieDomains();
+      const expire = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      domains.forEach((d) => { document.cookie = `googtrans=; ${expire}; path=/; domain=${d}`; });
+      document.cookie = `googtrans=; ${expire}; path=/`;
     };
-  }, [allowedLangCodes, lang, resetGoogTransToEnglish, applyGoogleLang, getCookieDomains]);
+  }, [allowedLangCodes, getCookieDomains]);
 
   const fetchStore = useCallback(async () => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`);
       if (!res.ok) throw new Error("Store not found");
       const data = await res.json();
-      const store = data.data;
-      setStoreData(store);
-      if (store.categories?.length > 0) setActiveCategory(store.categories[0]._id);
+      setStoreData(data.data);
+      if (data.data.categories?.length > 0) setActiveCategory(data.data.categories[0]._id);
       const initialSubCats = {};
-      store.categories.forEach((cat) => {
+      data.data.categories.forEach((cat) => {
         cat.subCategories?.forEach((sub) => { initialSubCats[sub._id] = true; });
       });
       setOpenSubCats(initialSubCats);
-      document.title = store.store.name;
+      document.title = data.data.store.name;
     } catch (err) { setError("Store not found"); }
   }, [slug]);
 
   useEffect(() => { fetchStore(); }, [fetchStore]);
 
-  useEffect(() => {
-    if (storeData) applyGoogleLang(lang);
-  }, [storeData, lang, applyGoogleLang]);
-
-  const toggleAccordion = (id) => setOpenSubCats((p) => ({ ...p, [id]: !p[id] }));
-  const scrollToCat = (id) => {
-    setActiveCategory(id);
-    const el = categoryRefs.current[id];
-    if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
-  };
-
   const onChangeLang = (e) => {
     const code = e.target.value;
-    const safe = allowedLangCodes.has(code) ? code : "en";
-    setLang(safe);
-    if (safe === "en") resetGoogTransToEnglish();
-    applyGoogleLang(safe);
+    setLang(code);
+    setSessionCookie(code);
+    applyGoogleLang(code);
   };
 
   if (error) return <div className="ps-status"><h2>{error}</h2></div>;
@@ -165,7 +148,6 @@ const PublicStore = ({ slug }) => {
   return (
     <div className="ps-wrapper">
       <div id="google_translate_element" className="ps-gt-hidden" style={{ display: 'none' }} />
-
       <header className="ps-hero">
         <div className="ps-hero-inner">
           <div className="ps-hero-top">
@@ -199,7 +181,11 @@ const PublicStore = ({ slug }) => {
             <button
               key={c._id}
               className={`ps-pill ${activeCategory === c._id ? "ps-pill-active" : ""}`}
-              onClick={() => scrollToCat(c._id)}
+              onClick={() => {
+                setActiveCategory(c._id);
+                const el = categoryRefs.current[c._id];
+                if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
+              }}
             >
               {c.name}
             </button>
@@ -213,7 +199,7 @@ const PublicStore = ({ slug }) => {
             <h2 className="ps-sec-title">{cat.name}</h2>
             {cat.subCategories?.map((sub) => (
               <div key={sub._id} className={`ps-acc ${openSubCats[sub._id] ? "ps-open" : ""}`}>
-                <div className="ps-acc-head" onClick={() => toggleAccordion(sub._id)}>
+                <div className="ps-acc-head" onClick={() => setOpenSubCats(p => ({...p, [sub._id]: !p[sub._id]}))}>
                   <div>
                     <span className="ps-acc-name">{sub.name}</span>
                     <span className="ps-acc-count">{sub.items?.length} items</span>
