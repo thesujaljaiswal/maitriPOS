@@ -12,51 +12,78 @@ const PublicStore = ({ slug }) => {
   const [openSubCats, setOpenSubCats] = useState({});
   const categoryRefs = useRef({});
 
-  // ✅ Alphabetical languages list (from language.json)
-  const sortedLangs = useMemo(() => {
-    return [...(LANGS || [])].sort((a, b) =>
-      (a.label || "").localeCompare(b.label || "", "en", { sensitivity: "base" })
-    );
+  /**
+   * ✅ Build safe language list:
+   * - Ensure "en" exists
+   * - Keep English pinned at the top
+   * - Rest alphabetical
+   */
+  const langsFinal = useMemo(() => {
+    const list = Array.isArray(LANGS) ? [...LANGS] : [];
+
+    const hasEn = list.some((l) => l?.code === "en");
+    if (!hasEn) list.push({ code: "en", label: "English" });
+
+    const en = list.find((l) => l?.code === "en") || { code: "en", label: "English" };
+    const rest = list
+      .filter((l) => l?.code && l.code !== "en")
+      .sort((a, b) =>
+        (a.label || "").localeCompare(b.label || "", "en", { sensitivity: "base" })
+      );
+
+    return [en, ...rest];
   }, []);
 
-  // ✅ Always start in English (prevents random Abkhaz/Azeri)
+  const allowedLangCodes = useMemo(() => {
+    return new Set(langsFinal.map((l) => l.code));
+  }, [langsFinal]);
+
+  // ✅ ALWAYS start in English (never read old localStorage)
   const [lang, setLang] = useState("en");
 
-  // ✅ Reset Google translate cookie to English on every load
-  const resetTranslateCookie = useCallback(() => {
+  // ✅ If lang ever becomes invalid, force back to English (prevents first-option fallback)
+  useEffect(() => {
+    if (!allowedLangCodes.has(lang)) setLang("en");
+  }, [lang, allowedLangCodes]);
+
+  /* =========================
+     Google Translate HARD RESET
+     ========================= */
+  const resetGoogTransToEnglish = useCallback(() => {
     try {
       const host = window.location.hostname;
 
-      // delete any existing googtrans cookie (both variants)
+      // Remove any previous language cookie (both cookie variants)
       document.cookie =
-        "googtrans=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+        "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
       document.cookie =
-        `googtrans=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${host}`;
+        `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${host}`;
 
-      // set english as default
-      document.cookie = "googtrans=/en/en;path=/";
-      document.cookie = `googtrans=/en/en;path=/;domain=${host}`;
+      // Force English as default
+      document.cookie = "googtrans=/en/en; path=/";
+      document.cookie = `googtrans=/en/en; path=/; domain=${host}`;
     } catch (e) {}
   }, []);
 
-  // ✅ Robust translate trigger (waits until widget is ready)
+  // ✅ Robust apply (waits for widget select to exist)
   const applyGoogleLang = useCallback((code, tries = 0) => {
     try {
       const combo = document.querySelector(".goog-te-combo");
       if (!combo) {
-        if (tries < 20) setTimeout(() => applyGoogleLang(code, tries + 1), 200);
+        if (tries < 25) setTimeout(() => applyGoogleLang(code, tries + 1), 200);
         return;
       }
+
       combo.value = code;
       combo.dispatchEvent(new Event("change"));
     } catch (e) {}
   }, []);
 
-  // ✅ Inject Google Translate once + force English on first load
+  // ✅ Load translate script once; always reset to English on mount
   useEffect(() => {
-    resetTranslateCookie();
+    resetGoogTransToEnglish();
 
-    // If script already exists (SPA navigation), just re-apply English
+    // If already loaded (SPA), just force English once
     if (document.getElementById("google-translate-script")) {
       applyGoogleLang("en");
       return;
@@ -69,7 +96,7 @@ const PublicStore = ({ slug }) => {
         "google_translate_element"
       );
 
-      // Force English once widget is ready
+      // Always begin as English
       applyGoogleLang("en");
     };
 
@@ -78,9 +105,11 @@ const PublicStore = ({ slug }) => {
     script.src =
       "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
     document.body.appendChild(script);
-  }, [applyGoogleLang, resetTranslateCookie]);
+  }, [applyGoogleLang, resetGoogTransToEnglish]);
 
-  // ✅ store fetch (unchanged logic)
+  /* =========================
+     Your original fetch logic (unchanged)
+     ========================= */
   const fetchStore = useCallback(async () => {
     try {
       const res = await fetch(
@@ -126,7 +155,7 @@ const PublicStore = ({ slug }) => {
     fetchStore();
   }, [fetchStore]);
 
-  // ✅ After data renders, re-apply current lang (prevents "sometimes not work")
+  // ✅ After content loads, apply current lang (fixes “sometimes doesn’t work”)
   useEffect(() => {
     if (!storeData) return;
     applyGoogleLang(lang);
@@ -141,15 +170,18 @@ const PublicStore = ({ slug }) => {
     if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
   };
 
-  // ✅ Dropdown change
   const onChangeLang = (e) => {
     const code = e.target.value;
-    setLang(code);
 
-    // If user goes back to English, also reset cookie to English
-    if (code === "en") resetTranslateCookie();
+    // Safety: if somehow invalid, force English
+    const safeCode = allowedLangCodes.has(code) ? code : "en";
 
-    applyGoogleLang(code);
+    setLang(safeCode);
+
+    // If English selected, hard reset cookie too
+    if (safeCode === "en") resetGoogTransToEnglish();
+
+    applyGoogleLang(safeCode);
   };
 
   if (error)
@@ -170,17 +202,18 @@ const PublicStore = ({ slug }) => {
 
   return (
     <div className="ps-wrapper">
-      {/* ✅ Google translate mount point (hidden) */}
+      {/* Google translate mount point (hidden) */}
       <div id="google_translate_element" className="ps-gt-hidden" />
 
       <header className="ps-hero">
         <div className="ps-hero-inner">
-          {/* ✅ Language dropdown (visible) - not translatable */}
+          {/* ✅ Language dropdown (NOT translatable) */}
           <div className="ps-hero-top">
             <div className="ps-lang-wrap notranslate" translate="no">
               <span className="ps-lang-chip notranslate" translate="no">
                 🌐 Language
               </span>
+
               <select
                 className="ps-lang-select notranslate"
                 translate="no"
@@ -188,7 +221,7 @@ const PublicStore = ({ slug }) => {
                 onChange={onChangeLang}
                 aria-label="Select language"
               >
-                {sortedLangs.map((l) => (
+                {langsFinal.map((l) => (
                   <option
                     key={l.code}
                     value={l.code}
