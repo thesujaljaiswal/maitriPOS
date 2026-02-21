@@ -20,26 +20,21 @@ const PublicStore = ({ slug }) => {
     );
   }, []);
 
-  /* =============================
-     FORCE GOOGLE TRANSLATE RESET
-     ============================= */
-  const forceEnglish = () => {
+  /* =======================
+     FIX GOOGLE COOKIE ISSUE
+     ======================= */
+  const resetTranslateCookie = () => {
     const host = window.location.hostname;
 
-    // clear previous cookie
     document.cookie =
       "googtrans=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
     document.cookie =
       `googtrans=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${host}`;
 
-    // set to english
     document.cookie = "googtrans=/en/en;path=/";
     document.cookie = `googtrans=/en/en;path=/;domain=${host}`;
   };
 
-  /* =============================
-     GOOGLE TRANSLATE TRIGGER
-     ============================= */
   const applyGoogleLang = useCallback((code, tries = 0) => {
     const combo = document.querySelector(".goog-te-combo");
 
@@ -52,11 +47,9 @@ const PublicStore = ({ slug }) => {
     combo.dispatchEvent(new Event("change"));
   }, []);
 
-  /* =============================
-     LOAD GOOGLE SCRIPT
-     ============================= */
+  /* LOAD TRANSLATE SCRIPT */
   useEffect(() => {
-    forceEnglish(); // ⭐ ALWAYS RESET COOKIE ON LOAD
+    resetTranslateCookie();
 
     if (document.getElementById("google-translate-script")) return;
 
@@ -65,8 +58,7 @@ const PublicStore = ({ slug }) => {
         { pageLanguage: "en", autoDisplay: false },
         "google_translate_element"
       );
-
-      applyGoogleLang("en"); // ⭐ FORCE ENGLISH
+      applyGoogleLang("en");
     };
 
     const script = document.createElement("script");
@@ -76,9 +68,9 @@ const PublicStore = ({ slug }) => {
     document.body.appendChild(script);
   }, [applyGoogleLang]);
 
-  /* =============================
+  /* =======================
      FETCH STORE DATA
-     ============================= */
+     ======================= */
   const fetchStore = useCallback(async () => {
     try {
       const res = await fetch(
@@ -112,9 +104,6 @@ const PublicStore = ({ slug }) => {
     fetchStore();
   }, [fetchStore]);
 
-  /* =============================
-     UI HANDLERS
-     ============================= */
   const toggleAccordion = (id) =>
     setOpenSubCats((p) => ({ ...p, [id]: !p[id] }));
 
@@ -130,9 +119,9 @@ const PublicStore = ({ slug }) => {
     applyGoogleLang(code);
   };
 
-  /* =============================
-     STATES
-     ============================= */
+  /* =======================
+     LOADING STATES
+     ======================= */
   if (error)
     return (
       <div className="ps-status">
@@ -149,9 +138,6 @@ const PublicStore = ({ slug }) => {
 
   const { store, categories } = storeData;
 
-  /* =============================
-     JSX
-     ============================= */
   return (
     <div className="ps-wrapper">
       <div id="google_translate_element" className="ps-gt-hidden" />
@@ -159,6 +145,7 @@ const PublicStore = ({ slug }) => {
       {/* HEADER */}
       <header className="ps-hero">
         <div className="ps-hero-inner">
+          {/* LANGUAGE SELECTOR */}
           <div className="ps-hero-top">
             <div className="ps-lang-wrap notranslate" translate="no">
               <span className="ps-lang-chip">🌐 Language</span>
@@ -226,24 +213,56 @@ const PublicStore = ({ slug }) => {
                   className="ps-acc-head"
                   onClick={() => toggleAccordion(sub._id)}
                 >
-                  <span className="ps-acc-name">{sub.name}</span>
+                  <div>
+                    <span className="ps-acc-name">{sub.name}</span>
+                    <span className="ps-acc-count">
+                      {sub.items?.length} items
+                    </span>
+                  </div>
+                  <span className="ps-chevron">↓</span>
                 </div>
 
-                <div className="ps-grid">
-                  {sub.items?.map((item) => (
-                    <ProductCard
-                      key={item._id}
-                      item={item}
-                      onOpen={setSelectedItem}
-                      store={store}
-                    />
-                  ))}
+                <div className="ps-acc-content">
+                  <div className="ps-grid">
+                    {sub.items?.map((item) => (
+                      <ProductCard
+                        key={item._id}
+                        item={item}
+                        onOpen={setSelectedItem}
+                        store={store}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}
           </section>
         ))}
       </main>
+
+      {/* MODAL */}
+      {selectedItem && (
+        <div className="ps-modal-overlay" onClick={() => setSelectedItem(null)}>
+          <div className="ps-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ps-modal-grid">
+              <div className="ps-modal-img">
+                <img src={selectedItem.image} alt={selectedItem.name} />
+                <button
+                  className="ps-close-btn"
+                  onClick={() => setSelectedItem(null)}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="ps-modal-info">
+                <h3>{selectedItem.name}</h3>
+                <p>{selectedItem.description}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -257,10 +276,18 @@ const ProductCard = memo(({ item, onOpen, store }) => {
       : 0);
 
   return (
-    <div className="ps-card" onClick={() => onOpen(item)}>
-      <img src={item.image || store.logo} alt={item.name} />
-      <h4>{item.name}</h4>
-      <span>₹{price}</span>
+    <div
+      className={`ps-card ${!item.isAvailable ? "ps-oos" : ""}`}
+      onClick={() => onOpen(item)}
+    >
+      <div className="ps-card-img">
+        <img src={item.image || store.logo} alt={item.name} />
+      </div>
+
+      <div className="ps-card-body">
+        <h4>{item.name}</h4>
+        <span className="ps-price">₹{price}</span>
+      </div>
     </div>
   );
 });
