@@ -59,12 +59,16 @@ const PublicStore = ({ slug }) => {
   const resetGoogTransToEnglish = useCallback(() => {
     try {
       const domains = getCookieDomains();
-      const expire = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      const expirePast = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      
+      // 1. Force clear existing persisted cookies
       domains.forEach((d) => {
-        document.cookie = `googtrans=; ${expire}; path=/; domain=${d}`;
+        document.cookie = `googtrans=; ${expirePast}; path=/; domain=${d}`;
       });
-      document.cookie = `googtrans=; ${expire}; path=/`;
-      // Set default to English
+      document.cookie = `googtrans=; ${expirePast}; path=/`;
+
+      // 2. Set as SESSION COOKIE (No 'expires' or 'max-age' attribute)
+      // This ensures the cookie dies when the tab/browser is closed.
       document.cookie = "googtrans=/en/en; path=/";
     } catch (e) {}
   }, [getCookieDomains]);
@@ -86,7 +90,11 @@ const PublicStore = ({ slug }) => {
 
     window.googleTranslateElementInit = () => {
       new window.google.translate.TranslateElement(
-        { pageLanguage: "en", autoDisplay: false, includedLanguages: Array.from(allowedLangCodes).join(',') },
+        { 
+          pageLanguage: "en", 
+          autoDisplay: false, 
+          includedLanguages: Array.from(allowedLangCodes).join(',') 
+        },
         "google_translate_element"
       );
       if (lang === "en") resetGoogTransToEnglish();
@@ -99,7 +107,17 @@ const PublicStore = ({ slug }) => {
       script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
       document.body.appendChild(script);
     }
-  }, [allowedLangCodes]);
+
+    // Cleanup: Clear translation cookies when user leaves the page component
+    return () => {
+        const domains = getCookieDomains();
+        const expire = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        domains.forEach((d) => {
+          document.cookie = `googtrans=; ${expire}; path=/; domain=${d}`;
+        });
+        document.cookie = `googtrans=; ${expire}; path=/`;
+    };
+  }, [allowedLangCodes, lang, resetGoogTransToEnglish, applyGoogleLang, getCookieDomains]);
 
   const fetchStore = useCallback(async () => {
     try {
