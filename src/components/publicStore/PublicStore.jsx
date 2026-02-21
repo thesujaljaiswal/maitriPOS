@@ -32,61 +32,57 @@ const PublicStore = ({ slug }) => {
     return [en, ...rest];
   }, []);
 
-  // 1. CLEARS ALL GOOGLE CACHE
-  const clearGoogleCache = useCallback(() => {
-    try {
-      const domains = [
-        window.location.hostname,
-        `.${window.location.hostname.split(".").slice(-2).join(".")}`,
-      ];
-      
-      domains.forEach((d) => {
-        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${d}`;
-        document.cookie = `googtrans=/en/en; path=/; domain=${d}`;
-      });
-      
-      document.cookie = "googtrans=/en/en; path=/";
-      localStorage.removeItem("googtrans");
-      sessionStorage.removeItem("googtrans");
-    } catch (e) {
-      console.error("Cache clear failed", e);
+  const getCookieDomains = useCallback(() => {
+    const host = window.location.hostname;
+    const parts = host.split(".");
+    const domains = [host];
+    if (parts.length >= 2) {
+      const root = parts.slice(-2).join(".");
+      domains.push(root, `.${root}`);
     }
+    return domains;
   }, []);
+
+  const setTranslateCookie = useCallback((code) => {
+    const domains = getCookieDomains();
+    // The format MUST be /en/TARGET_CODE
+    const cookieValue = `googtrans=/en/${code}`;
+    domains.forEach((d) => {
+      document.cookie = `${cookieValue}; path=/; domain=${d}`;
+    });
+    document.cookie = `${cookieValue}; path=/`;
+  }, [getCookieDomains]);
 
   useLayoutEffect(() => {
     document.documentElement.lang = "en";
-    // This attribute specifically tells Google Translate NOT to offer translation
-    document.documentElement.setAttribute("class", "notranslate");
+    // Remove global notranslate so the engine can actually work
+    document.documentElement.classList.remove("notranslate");
   }, []);
 
   const applyGoogleLang = useCallback((code) => {
     try {
+      setTranslateCookie(code);
       const combo = document.querySelector(".goog-te-combo");
       if (combo) {
         combo.value = code;
         combo.dispatchEvent(new Event("change"));
+      } else {
+        // If combo isn't ready, the cookie we set above will handle it on refresh/load
+        window.location.reload(); 
       }
     } catch (e) {}
-  }, []);
+  }, [setTranslateCookie]);
 
   useEffect(() => {
-    clearGoogleCache();
-
     window.googleTranslateElementInit = () => {
       new window.google.translate.TranslateElement(
         {
-          pageLanguage: "en", 
-          // 2. Force ONLY your languages to prevent random defaults
-          includedLanguages: langsFinal.map(l => l.code).join(','),
-          layout: window.google.translate.TranslateElement.InlineLayout.HORIZONTAL,
+          pageLanguage: "en",
+          includedLanguages: langsFinal.map((l) => l.code).join(","),
           autoDisplay: false,
-          multilanguagePage: false // Important: Tells Google the page is one language
         },
         "google_translate_element"
       );
-      
-      // Force set to English after a short delay
-      setTimeout(() => applyGoogleLang("en"), 1000);
     };
 
     if (!document.getElementById("google-translate-script")) {
@@ -95,7 +91,7 @@ const PublicStore = ({ slug }) => {
       script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
       document.body.appendChild(script);
     }
-  }, [clearGoogleCache, applyGoogleLang, langsFinal]);
+  }, [langsFinal]);
 
   const fetchStore = useCallback(async () => {
     try {
@@ -125,8 +121,8 @@ const PublicStore = ({ slug }) => {
 
   return (
     <div className="ps-wrapper">
-      {/* Hide the actual widget but keep it in DOM */}
-      <div id="google_translate_element" style={{ visibility: "hidden", position: "absolute", top: "-9999px" }} />
+      {/* Container must exist for the script to attach */}
+      <div id="google_translate_element" style={{ display: "none" }} />
       
       <header className="ps-hero">
         <div className="ps-hero-inner">
@@ -140,7 +136,7 @@ const PublicStore = ({ slug }) => {
               </select>
             </div>
           </div>
-          <div className="ps-logo-wrap">
+          <div className="ps-logo-wrap notranslate">
             <img src={store.logo || logo} alt="Logo" className="ps-logo" />
             <span className={`ps-badge ${store.isOnline ? "ps-on" : "ps-off"}`}>
               {store.isOnline ? "Accepting Orders" : "Closed"}
@@ -151,7 +147,7 @@ const PublicStore = ({ slug }) => {
         </div>
       </header>
 
-      <nav className="ps-nav">
+      <nav className="ps-nav notranslate">
         <div className="ps-nav-scroll">
           {categories.map((c) => (
             <button
@@ -159,7 +155,8 @@ const PublicStore = ({ slug }) => {
               className={`ps-pill ${activeCategory === c._id ? "ps-pill-active" : ""}`}
               onClick={() => {
                 setActiveCategory(c._id);
-                window.scrollTo({ top: categoryRefs.current[c._id].offsetTop - 80, behavior: "smooth" });
+                const el = categoryRefs.current[c._id];
+                if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
               }}
             >
               {c.name}
@@ -200,7 +197,7 @@ const ProductCard = memo(({ item, onOpen, store }) => {
       <div className="ps-card-img"><img src={item.image || store.logo} alt={item.name} /></div>
       <div className="ps-card-body">
         <h4>{item.name}</h4>
-        <span className="ps-price">₹{price}</span>
+        <span className="ps-price notranslate">₹{price}</span>
       </div>
     </div>
   );
