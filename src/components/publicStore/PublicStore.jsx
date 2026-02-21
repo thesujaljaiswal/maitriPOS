@@ -19,85 +19,78 @@ const PublicStore = ({ slug }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [openSubCats, setOpenSubCats] = useState({});
   const categoryRefs = useRef({});
-  const [lang, setLang] = useState("en");
 
   const langsFinal = useMemo(() => {
     const list = Array.isArray(LANGS) ? [...LANGS] : [];
     const hasEn = list.some((l) => l?.code === "en");
     if (!hasEn) list.push({ code: "en", label: "English" });
-    const en = list.find((l) => l?.code === "en");
+
+    const en = list.find((l) => l?.code === "en") || { code: "en", label: "English" };
     const rest = list
       .filter((l) => l?.code && l.code !== "en")
-      .sort((a, b) => (a.label || "").localeCompare(b.label || ""));
+      .sort((a, b) => (a.label || "").localeCompare(b.label || "", "en", { sensitivity: "base" }));
+
     return [en, ...rest];
+  }, []);
+
+  const allowedLangCodes = useMemo(() => new Set(langsFinal.map((l) => l.code)), [langsFinal]);
+  const [lang, setLang] = useState("en");
+
+  useLayoutEffect(() => {
+    try {
+      if (!document.querySelector('meta[name="google"][content="notranslate"]')) {
+        const m = document.createElement("meta");
+        m.name = "google";
+        m.content = "notranslate";
+        document.head.appendChild(m);
+      }
+      document.documentElement.lang = "en";
+    } catch (e) {}
   }, []);
 
   const getCookieDomains = useCallback(() => {
     const host = window.location.hostname;
-    const parts = host.split(".");
-    const domains = [host];
-    if (parts.length >= 2) {
-      const root = parts.slice(-2).join(".");
-      domains.push(root, `.${root}`);
-    }
-    return domains;
+    const parts = host.split(".").filter(Boolean);
+    let root = host;
+    if (parts.length >= 2) root = `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
+    return [host, root, `.${root}`];
   }, []);
 
-  // FORCE CLEAR function to stop the "Abkhaz" or old cookie from returning
-  const clearTranslateCookies = useCallback(() => {
-    const domains = getCookieDomains();
-    domains.forEach((d) => {
-      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${d}`;
-      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-    });
-    sessionStorage.removeItem("googtrans");
-    localStorage.removeItem("googtrans");
+  const resetGoogTransToEnglish = useCallback(() => {
+    try {
+      const domains = getCookieDomains();
+      const expire = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      domains.forEach((d) => {
+        document.cookie = `googtrans=; ${expire}; path=/; domain=${d}`;
+      });
+      document.cookie = `googtrans=; ${expire}; path=/`;
+      // Set default to English
+      document.cookie = "googtrans=/en/en; path=/";
+    } catch (e) {}
   }, [getCookieDomains]);
 
-  const setTranslateCookie = useCallback((code) => {
-    clearTranslateCookies(); // Clear old ones first
-    if (code === "en") return; // English doesn't need a cookie
-
-    const domains = getCookieDomains();
-    const cookieValue = `googtrans=/en/${code}`;
-    domains.forEach((d) => {
-      document.cookie = `${cookieValue}; path=/; domain=${d}`;
-    });
-    document.cookie = `${cookieValue}; path=/`;
-  }, [getCookieDomains, clearTranslateCookies]);
-
-  useLayoutEffect(() => {
-    document.documentElement.lang = "en";
+  const applyGoogleLang = useCallback((code, tries = 0) => {
+    try {
+      const combo = document.querySelector(".goog-te-combo");
+      if (!combo) {
+        if (tries < 30) setTimeout(() => applyGoogleLang(code, tries + 1), 150);
+        return;
+      }
+      combo.value = code;
+      combo.dispatchEvent(new Event("change"));
+    } catch (e) {}
   }, []);
 
-  const applyGoogleLang = useCallback((code) => {
-    try {
-      setTranslateCookie(code);
-      const combo = document.querySelector(".goog-te-combo");
-      if (combo) {
-        combo.value = code;
-        combo.dispatchEvent(new Event("change"));
-      } else {
-        window.location.reload(); 
-      }
-    } catch (e) {}
-  }, [setTranslateCookie]);
-
   useEffect(() => {
-    // On fresh load, if no specific lang is set in state, nuke cookies to prevent auto-translate
-    if (lang === "en") {
-        clearTranslateCookies();
-    }
+    if (lang === "en") resetGoogTransToEnglish();
 
     window.googleTranslateElementInit = () => {
       new window.google.translate.TranslateElement(
-        {
-          pageLanguage: "en",
-          includedLanguages: langsFinal.map((l) => l.code).join(","),
-          autoDisplay: false,
-        },
+        { pageLanguage: "en", autoDisplay: false, includedLanguages: Array.from(allowedLangCodes).join(',') },
         "google_translate_element"
       );
+      if (lang === "en") resetGoogTransToEnglish();
+      applyGoogleLang(lang);
     };
 
     if (!document.getElementById("google-translate-script")) {
@@ -106,7 +99,7 @@ const PublicStore = ({ slug }) => {
       script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
       document.body.appendChild(script);
     }
-  }, [langsFinal, clearTranslateCookies]);
+  }, [allowedLangCodes]);
 
   const fetchStore = useCallback(async () => {
     try {
@@ -115,29 +108,36 @@ const PublicStore = ({ slug }) => {
       const data = await res.json();
       const store = data.data;
       setStoreData(store);
-      
       if (store.categories?.length > 0) setActiveCategory(store.categories[0]._id);
-      
       const initialSubCats = {};
       store.categories.forEach((cat) => {
         cat.subCategories?.forEach((sub) => { initialSubCats[sub._id] = true; });
       });
       setOpenSubCats(initialSubCats);
       document.title = store.store.name;
-    } catch (err) {
-      setError("Store not found");
-    }
+    } catch (err) { setError("Store not found"); }
   }, [slug]);
 
   useEffect(() => { fetchStore(); }, [fetchStore]);
 
-  const onChangeLang = (e) => {
-    const code = e.target.value;
-    setLang(code);
-    applyGoogleLang(code);
-  };
+  useEffect(() => {
+    if (storeData) applyGoogleLang(lang);
+  }, [storeData, lang, applyGoogleLang]);
 
   const toggleAccordion = (id) => setOpenSubCats((p) => ({ ...p, [id]: !p[id] }));
+  const scrollToCat = (id) => {
+    setActiveCategory(id);
+    const el = categoryRefs.current[id];
+    if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
+  };
+
+  const onChangeLang = (e) => {
+    const code = e.target.value;
+    const safe = allowedLangCodes.has(code) ? code : "en";
+    setLang(safe);
+    if (safe === "en") resetGoogTransToEnglish();
+    applyGoogleLang(safe);
+  };
 
   if (error) return <div className="ps-status"><h2>{error}</h2></div>;
   if (!storeData) return <div className="ps-status"><Oval color="#000" /></div>;
@@ -146,12 +146,12 @@ const PublicStore = ({ slug }) => {
 
   return (
     <div className="ps-wrapper">
-      <div id="google_translate_element" style={{ display: "none" }} />
-      
+      <div id="google_translate_element" className="ps-gt-hidden" style={{ display: 'none' }} />
+
       <header className="ps-hero">
         <div className="ps-hero-inner">
           <div className="ps-hero-top">
-            <div className="ps-lang-wrap notranslate">
+            <div className="ps-lang-wrap notranslate" translate="no">
               <span className="ps-lang-chip">🌐 Language</span>
               <select className="ps-lang-select" value={lang} onChange={onChangeLang}>
                 {langsFinal.map((l) => (
@@ -168,6 +168,10 @@ const PublicStore = ({ slug }) => {
           </div>
           <h1 className="ps-title">{store.name}</h1>
           <p className="ps-addr">{store.address}</p>
+          <div className="ps-links notranslate">
+            <a href={`tel:${store.contact.phone}`}>📞 {store.contact.phone}</a>
+            <a href={`mailto:${store.contact.email}`}>✉️ Email Us</a>
+          </div>
         </div>
       </header>
 
@@ -177,11 +181,7 @@ const PublicStore = ({ slug }) => {
             <button
               key={c._id}
               className={`ps-pill ${activeCategory === c._id ? "ps-pill-active" : ""}`}
-              onClick={() => {
-                setActiveCategory(c._id);
-                const el = categoryRefs.current[c._id];
-                if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
-              }}
+              onClick={() => scrollToCat(c._id)}
             >
               {c.name}
             </button>
@@ -203,10 +203,12 @@ const PublicStore = ({ slug }) => {
                   <span className="ps-chevron">↓</span>
                 </div>
                 <div className="ps-acc-content">
-                  <div className="ps-grid">
-                    {sub.items?.map((item) => (
-                      <ProductCard key={item._id} item={item} onOpen={setSelectedItem} store={store} />
-                    ))}
+                  <div className="ps-acc-inner">
+                    <div className="ps-grid">
+                      {sub.items?.map((item) => (
+                        <ProductCard key={item._id} item={item} onOpen={setSelectedItem} store={store} />
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -214,6 +216,12 @@ const PublicStore = ({ slug }) => {
           </section>
         ))}
       </main>
+
+      <footer className="ps-footer notranslate">
+        <p className="ps-powered-by">
+          Powered by <a href="https://maitripos.com" target="_blank" rel="noreferrer">maitriPOS.com</a>
+        </p>
+      </footer>
 
       {selectedItem && (
         <div className="ps-modal-overlay" onClick={() => setSelectedItem(null)}>
@@ -224,11 +232,16 @@ const PublicStore = ({ slug }) => {
                 <button className="ps-close-btn" onClick={() => setSelectedItem(null)}>&times;</button>
               </div>
               <div className="ps-modal-info">
-                <h3>{selectedItem.name}</h3>
-                <span className="ps-modal-price notranslate">₹{selectedItem.price || 0}</span>
-                <p>{selectedItem.description || "No description available."}</p>
+                <div className="ps-modal-header">
+                  <h3>{selectedItem.name}</h3>
+                  <span className="ps-modal-price notranslate">
+                    ₹{selectedItem.price || Math.min(...selectedItem.variants.map((v) => v.price))}
+                  </span>
+                </div>
+                <p className="ps-modal-desc">{selectedItem.description || "No description available."}</p>
                 {selectedItem.variants?.length > 0 && (
                   <div className="ps-var-list">
+                    <label>Available Options</label>
                     {selectedItem.variants.map((v) => (
                       <div key={v._id} className="ps-var-row">
                         <span>{v.name}</span>
@@ -251,10 +264,16 @@ const ProductCard = memo(({ item, onOpen, store }) => {
   const price = item.price || (item.variants?.length ? Math.min(...item.variants.map((v) => v.price)) : 0);
   return (
     <div className={`ps-card ${!item.isAvailable ? "ps-oos" : ""}`} onClick={() => onOpen(item)}>
-      <div className="ps-card-img"><img src={item.image || store.logo} alt={item.name} loading="lazy" /></div>
+      <div className="ps-card-img">
+        <img src={item.image || store.logo} alt={item.name} loading="lazy" />
+      </div>
       <div className="ps-card-body">
         <h4>{item.name}</h4>
-        <span className="ps-price notranslate">₹{price}</span>
+        <div className="ps-card-foot">
+          <span className="ps-price notranslate">
+            ₹{price}{item.variants?.length > 0 ? " onwards" : ""}
+          </span>
+        </div>
       </div>
     </div>
   );
