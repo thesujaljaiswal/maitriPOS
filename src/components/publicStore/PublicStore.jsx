@@ -76,19 +76,31 @@ const PublicStore = ({ slug }) => {
     if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
   };
 
-  // ✅ helper to trigger translation
-  const applyGoogleLang = (code) => {
+  /**
+   * ✅ Robust translate trigger
+   * Sometimes Google widget loads late → retry a few times
+   */
+  const applyGoogleLang = useCallback((code, tries = 0) => {
     try {
       const combo = document.querySelector(".goog-te-combo");
-      if (!combo) return;
+
+      if (!combo) {
+        if (tries < 15) setTimeout(() => applyGoogleLang(code, tries + 1), 200);
+        return;
+      }
+
       combo.value = code;
       combo.dispatchEvent(new Event("change"));
     } catch (e) {}
-  };
+  }, []);
 
   // ✅ Inject Google Translate once
   useEffect(() => {
-    if (document.getElementById("google-translate-script")) return;
+    if (document.getElementById("google-translate-script")) {
+      // widget may already exist → apply saved language safely
+      applyGoogleLang(localStorage.getItem("ps_lang") || "en");
+      return;
+    }
 
     window.googleTranslateElementInit = () => {
       new window.google.translate.TranslateElement(
@@ -96,9 +108,7 @@ const PublicStore = ({ slug }) => {
         "google_translate_element"
       );
 
-      setTimeout(() => {
-        applyGoogleLang(localStorage.getItem("ps_lang") || "en");
-      }, 700);
+      applyGoogleLang(localStorage.getItem("ps_lang") || "en");
     };
 
     const script = document.createElement("script");
@@ -106,13 +116,19 @@ const PublicStore = ({ slug }) => {
     script.src =
       "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
     document.body.appendChild(script);
-  }, []);
+  }, [applyGoogleLang]);
+
+  // ✅ Re-apply language after store content loads (route change safety)
+  useEffect(() => {
+    if (!storeData) return;
+    applyGoogleLang(localStorage.getItem("ps_lang") || "en");
+  }, [storeData, applyGoogleLang]);
 
   const onChangeLang = (e) => {
     const code = e.target.value;
     setLang(code);
     localStorage.setItem("ps_lang", code);
-    setTimeout(() => applyGoogleLang(code), 100);
+    applyGoogleLang(code);
   };
 
   if (error)
@@ -146,10 +162,7 @@ const PublicStore = ({ slug }) => {
               aria-label="Language selector"
               translate="no"
             >
-              <span
-                className="ps-lang-chip notranslate"
-                translate="no"
-              >
+              <span className="ps-lang-chip notranslate" translate="no">
                 🌐 Language
               </span>
 
