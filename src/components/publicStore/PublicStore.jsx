@@ -12,17 +12,15 @@ const PublicStore = ({ slug }) => {
   const [openSubCats, setOpenSubCats] = useState({});
   const categoryRefs = useRef({});
 
-  // ✅ Language state
-  const [lang, setLang] = useState(
-    () => localStorage.getItem("ps_lang") || "en"
-  );
-
   // ✅ Alphabetical dropdown always
   const sortedLangs = useMemo(() => {
     return [...(LANGS || [])].sort((a, b) =>
       (a.label || "").localeCompare(b.label || "", "en", { sensitivity: "base" })
     );
   }, []);
+
+  // ✅ Always start in English on every refresh
+  const [lang, setLang] = useState("en");
 
   const fetchStore = useCallback(async () => {
     try {
@@ -76,6 +74,27 @@ const PublicStore = ({ slug }) => {
     if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
   };
 
+  // ✅ cookie helpers (prevents "random language" like az)
+  const setGoogTransEnglish = useCallback(() => {
+    const host = window.location.hostname;
+
+    // set to English (works for most cases)
+    document.cookie = "googtrans=/en/en;path=/";
+    document.cookie = `googtrans=/en/en;path=/;domain=${host}`;
+
+    // also ensure our UI state shows English by default
+    localStorage.setItem("ps_lang", "en");
+    setLang("en");
+  }, []);
+
+  const clearGoogTransCookie = useCallback(() => {
+    const host = window.location.hostname;
+
+    // expire cookie (both variants)
+    document.cookie = "googtrans=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+    document.cookie = `googtrans=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${host}`;
+  }, []);
+
   /**
    * ✅ Robust translate trigger
    * Sometimes Google widget loads late → retry a few times
@@ -83,22 +102,36 @@ const PublicStore = ({ slug }) => {
   const applyGoogleLang = useCallback((code, tries = 0) => {
     try {
       const combo = document.querySelector(".goog-te-combo");
-
       if (!combo) {
         if (tries < 15) setTimeout(() => applyGoogleLang(code, tries + 1), 200);
         return;
       }
-
       combo.value = code;
       combo.dispatchEvent(new Event("change"));
     } catch (e) {}
   }, []);
 
+  // ✅ Force English on every mount/refresh + clear cookie when tab closes
+  useEffect(() => {
+    // Always begin in English on refresh
+    setGoogTransEnglish();
+
+    const onBeforeUnload = () => {
+      // when tab is closed / refreshed, remove translate cookie so it won't "stick"
+      clearGoogTransCookie();
+      // keep English as the only default
+      localStorage.setItem("ps_lang", "en");
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [setGoogTransEnglish, clearGoogTransCookie]);
+
   // ✅ Inject Google Translate once
   useEffect(() => {
     if (document.getElementById("google-translate-script")) {
-      // widget may already exist → apply saved language safely
-      applyGoogleLang(localStorage.getItem("ps_lang") || "en");
+      // widget may already exist → make sure English is applied
+      applyGoogleLang("en");
       return;
     }
 
@@ -108,7 +141,8 @@ const PublicStore = ({ slug }) => {
         "google_translate_element"
       );
 
-      applyGoogleLang(localStorage.getItem("ps_lang") || "en");
+      // Ensure English is applied after init
+      applyGoogleLang("en");
     };
 
     const script = document.createElement("script");
@@ -118,15 +152,24 @@ const PublicStore = ({ slug }) => {
     document.body.appendChild(script);
   }, [applyGoogleLang]);
 
-  // ✅ Re-apply language after store content loads (route change safety)
+  // ✅ Re-apply English when store loads (route/content safety)
   useEffect(() => {
     if (!storeData) return;
-    applyGoogleLang(localStorage.getItem("ps_lang") || "en");
+    applyGoogleLang("en");
   }, [storeData, applyGoogleLang]);
 
   const onChangeLang = (e) => {
     const code = e.target.value;
     setLang(code);
+
+    // if user selects English → also reset cookie
+    if (code === "en") {
+      setGoogTransEnglish();
+      applyGoogleLang("en");
+      return;
+    }
+
+    // allow translation while staying on the page
     localStorage.setItem("ps_lang", code);
     applyGoogleLang(code);
   };
