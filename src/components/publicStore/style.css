@@ -3,7 +3,9 @@
   --bg: #fdfdfd;
   --border: #c7c7c7;
 }
-
+.goog-te-banner-frame {
+  display: none !important;
+}
 .ps-wrapper {
   font-family: "Inter", sans-serif;
   background: var(--bg);
