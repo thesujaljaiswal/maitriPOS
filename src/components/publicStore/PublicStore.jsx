@@ -1,30 +1,9 @@
-import { useEffect, useState, useRef, useCallback, memo } from "react";
+// PublicStore.jsx  (language.json is in SAME folder)
+import { useEffect, useState, useRef, useCallback, memo, useMemo } from "react";
 import logo from "../../assets/maitriPOS ICON 2.jpg";
 import "./style.css";
 import { Oval } from "react-loader-spinner";
-
-const LANGS = [
-  { code: "en", label: "English" },
-  { code: "hi", label: "Hindi" },
-  { code: "mr", label: "Marathi" },
-  { code: "gu", label: "Gujarati" },
-  { code: "bn", label: "Bengali" },
-  { code: "ta", label: "Tamil" },
-  { code: "te", label: "Telugu" },
-  { code: "kn", label: "Kannada" },
-  { code: "ml", label: "Malayalam" },
-  { code: "pa", label: "Punjabi" },
-  { code: "ur", label: "Urdu" },
-  { code: "ar", label: "Arabic" },
-  { code: "fr", label: "French" },
-  { code: "de", label: "German" },
-  { code: "es", label: "Spanish" },
-  { code: "pt", label: "Portuguese" },
-  { code: "ru", label: "Russian" },
-  { code: "ja", label: "Japanese" },
-  { code: "ko", label: "Korean" },
-  { code: "zh-CN", label: "Chinese (Simplified)" },
-];
+import LANGS from "./language.json";
 
 const PublicStore = ({ slug }) => {
   const [storeData, setStoreData] = useState(null);
@@ -35,12 +14,21 @@ const PublicStore = ({ slug }) => {
   const categoryRefs = useRef({});
 
   // ✅ Language state
-  const [lang, setLang] = useState(() => localStorage.getItem("ps_lang") || "en");
+  const [lang, setLang] = useState(
+    () => localStorage.getItem("ps_lang") || "en"
+  );
+
+  // ✅ Alphabetical dropdown always
+  const sortedLangs = useMemo(() => {
+    return [...(LANGS || [])].sort((a, b) =>
+      (a.label || "").localeCompare(b.label || "", "en", { sensitivity: "base" })
+    );
+  }, []);
 
   const fetchStore = useCallback(async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`,
+        `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`
       );
       if (!res.ok) throw new Error("Store not found");
       const data = await res.json();
@@ -48,8 +36,7 @@ const PublicStore = ({ slug }) => {
 
       setStoreData(store);
 
-      if (store.categories?.length > 0)
-        setActiveCategory(store.categories[0]._id);
+      if (store.categories?.length > 0) setActiveCategory(store.categories[0]._id);
 
       const initialSubCats = {};
       store.categories.forEach((cat) => {
@@ -59,10 +46,8 @@ const PublicStore = ({ slug }) => {
       });
       setOpenSubCats(initialSubCats);
 
-      // Update Page Title
       document.title = store.store.name;
 
-      // Update Favicon
       const logoUrl = store.store.logo;
       if (logoUrl) {
         let link = document.querySelector("link[rel~='icon']");
@@ -91,26 +76,29 @@ const PublicStore = ({ slug }) => {
     if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
   };
 
+  // ✅ helper to trigger translation
+  const applyGoogleLang = (code) => {
+    try {
+      const combo = document.querySelector(".goog-te-combo");
+      if (!combo) return;
+      combo.value = code;
+      combo.dispatchEvent(new Event("change"));
+    } catch (e) {}
+  };
+
   // ✅ Inject Google Translate once
   useEffect(() => {
-    // If already loaded, skip
     if (document.getElementById("google-translate-script")) return;
 
-    // Init function must be on window for Google callback
     window.googleTranslateElementInit = () => {
-      // eslint-disable-next-line no-undef
       new window.google.translate.TranslateElement(
-        {
-          pageLanguage: "en",
-          autoDisplay: false,
-        },
+        { pageLanguage: "en", autoDisplay: false },
         "google_translate_element"
       );
 
-      // Apply saved language (after widget is ready)
       setTimeout(() => {
         applyGoogleLang(localStorage.getItem("ps_lang") || "en");
-      }, 500);
+      }, 700);
     };
 
     const script = document.createElement("script");
@@ -120,23 +108,11 @@ const PublicStore = ({ slug }) => {
     document.body.appendChild(script);
   }, []);
 
-  // ✅ helper to trigger translation
-  const applyGoogleLang = (code) => {
-    try {
-      // Google creates a hidden select with class "goog-te-combo"
-      const combo = document.querySelector(".goog-te-combo");
-      if (!combo) return;
-
-      combo.value = code;
-      combo.dispatchEvent(new Event("change"));
-    } catch (e) {}
-  };
-
   const onChangeLang = (e) => {
     const code = e.target.value;
     setLang(code);
     localStorage.setItem("ps_lang", code);
-    applyGoogleLang(code);
+    setTimeout(() => applyGoogleLang(code), 100);
   };
 
   if (error)
@@ -158,38 +134,33 @@ const PublicStore = ({ slug }) => {
   return (
     <div className="ps-wrapper">
       {/* ✅ Google translate mount point (hidden) */}
-      <div id="google_translate_element" style={{ display: "none" }} />
+      <div id="google_translate_element" className="ps-gt-hidden" />
 
       <header className="ps-hero">
         <div className="ps-hero-inner">
+          {/* ✅ Top bar */}
+          <div className="ps-hero-top">
+            <div className="ps-lang-wrap" aria-label="Language selector">
+              <span className="ps-lang-chip">🌐 Language</span>
+              <select
+                className="ps-lang-select"
+                value={lang}
+                onChange={onChangeLang}
+              >
+                {sortedLangs.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="ps-logo-wrap">
             <img src={store.logo || logo} alt="Logo" className="ps-logo" />
             <span className={`ps-badge ${store.isOnline ? "ps-on" : "ps-off"}`}>
               {store.isOnline ? "Accepting Orders" : "Closed"}
             </span>
-          </div>
-
-          {/* ✅ Language dropdown (visible) */}
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <select
-              value={lang}
-              onChange={onChangeLang}
-              style={{
-                padding: "8px 10px",
-                borderRadius: "10px",
-                border: "1px solid rgba(0,0,0,0.15)",
-                outline: "none",
-                fontSize: "14px",
-                background: "#fff",
-              }}
-              aria-label="Select language"
-            >
-              {LANGS.map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.label}
-                </option>
-              ))}
-            </select>
           </div>
 
           <h1 className="ps-title">{store.name}</h1>
@@ -328,6 +299,7 @@ const ProductCard = memo(({ item, onOpen, store }) => {
     (item.variants?.length
       ? Math.min(...item.variants.map((v) => v.price))
       : 0);
+
   return (
     <div
       className={`ps-card ${!item.isAvailable ? "ps-oos" : ""}`}
