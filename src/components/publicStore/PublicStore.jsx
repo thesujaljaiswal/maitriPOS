@@ -19,64 +19,45 @@ const PublicStore = ({ slug }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [openSubCats, setOpenSubCats] = useState({});
   const categoryRefs = useRef({});
+  const [lang, setLang] = useState("en");
 
   const langsFinal = useMemo(() => {
     const list = Array.isArray(LANGS) ? [...LANGS] : [];
     const hasEn = list.some((l) => l?.code === "en");
     if (!hasEn) list.push({ code: "en", label: "English" });
-
     const en = list.find((l) => l?.code === "en");
     const rest = list
       .filter((l) => l?.code && l.code !== "en")
       .sort((a, b) => (a.label || "").localeCompare(b.label || ""));
-
     return [en, ...rest];
   }, []);
 
-  const allowedLangCodes = useMemo(() => {
-    return new Set(langsFinal.map((l) => l.code));
-  }, [langsFinal]);
-
-  const [lang, setLang] = useState("en");
-
-  useLayoutEffect(() => {
-    // Force the document language to English to stop Google's auto-detection
-    document.documentElement.lang = "en";
-    document.documentElement.setAttribute("xml:lang", "en");
-    
-    const meta = document.createElement("meta");
-    meta.name = "google";
-    meta.content = "notranslate";
-    if (!document.querySelector('meta[name="google"]')) {
-      document.head.appendChild(meta);
-    }
-  }, []);
-
-  const getCookieDomains = useCallback(() => {
-    const host = window.location.hostname;
-    const parts = host.split(".");
-    const domains = [host];
-    if (parts.length >= 2) {
-      const root = parts.slice(-2).join(".");
-      domains.push(root, `.${root}`);
-    }
-    return domains;
-  }, []);
-
-  const resetGoogTransToEnglish = useCallback(() => {
+  // 1. CLEARS ALL GOOGLE CACHE
+  const clearGoogleCache = useCallback(() => {
     try {
-      const domains = getCookieDomains();
-      // Use a very specific path and value to force English-to-English (no translation)
-      const cookieValue = "googtrans=/en/en";
-      const clearValue = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      const domains = [
+        window.location.hostname,
+        `.${window.location.hostname.split(".").slice(-2).join(".")}`,
+      ];
       
       domains.forEach((d) => {
-        document.cookie = `${clearValue}; path=/; domain=${d}`;
-        document.cookie = `${cookieValue}; path=/; domain=${d}`;
+        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${d}`;
+        document.cookie = `googtrans=/en/en; path=/; domain=${d}`;
       });
-      document.cookie = `${cookieValue}; path=/`;
-    } catch (e) {}
-  }, [getCookieDomains]);
+      
+      document.cookie = "googtrans=/en/en; path=/";
+      localStorage.removeItem("googtrans");
+      sessionStorage.removeItem("googtrans");
+    } catch (e) {
+      console.error("Cache clear failed", e);
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    document.documentElement.lang = "en";
+    // This attribute specifically tells Google Translate NOT to offer translation
+    document.documentElement.setAttribute("class", "notranslate");
+  }, []);
 
   const applyGoogleLang = useCallback((code) => {
     try {
@@ -89,22 +70,23 @@ const PublicStore = ({ slug }) => {
   }, []);
 
   useEffect(() => {
-    // 1. Clear existing cookies that might be stuck on Abkhaz
-    resetGoogTransToEnglish();
+    clearGoogleCache();
 
     window.googleTranslateElementInit = () => {
       new window.google.translate.TranslateElement(
         {
-          pageLanguage: "en",
-          includedLanguages: Array.from(allowedLangCodes).join(","),
-          layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+          pageLanguage: "en", 
+          // 2. Force ONLY your languages to prevent random defaults
+          includedLanguages: langsFinal.map(l => l.code).join(','),
+          layout: window.google.translate.TranslateElement.InlineLayout.HORIZONTAL,
           autoDisplay: false,
+          multilanguagePage: false // Important: Tells Google the page is one language
         },
         "google_translate_element"
       );
       
-      // Force "English" immediately after initialization
-      setTimeout(() => applyGoogleLang("en"), 500);
+      // Force set to English after a short delay
+      setTimeout(() => applyGoogleLang("en"), 1000);
     };
 
     if (!document.getElementById("google-translate-script")) {
@@ -113,7 +95,7 @@ const PublicStore = ({ slug }) => {
       script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
       document.body.appendChild(script);
     }
-  }, [allowedLangCodes, applyGoogleLang, resetGoogTransToEnglish]);
+  }, [clearGoogleCache, applyGoogleLang, langsFinal]);
 
   const fetchStore = useCallback(async () => {
     try {
@@ -122,10 +104,6 @@ const PublicStore = ({ slug }) => {
       const data = await res.json();
       setStoreData(data.data);
       if (data.data.categories?.length > 0) setActiveCategory(data.data.categories[0]._id);
-      
-      const initialSubCats = {};
-      data.data.categories.forEach(cat => cat.subCategories?.forEach(sub => initialSubCats[sub._id] = true));
-      setOpenSubCats(initialSubCats);
       document.title = data.data.store.name;
     } catch (err) {
       setError("Store not found");
@@ -138,7 +116,7 @@ const PublicStore = ({ slug }) => {
     const code = e.target.value;
     setLang(code);
     applyGoogleLang(code);
-  }, [allowedLangCodes, applyGoogleLang]);
+  };
 
   if (error) return <div className="ps-status"><h2>{error}</h2></div>;
   if (!storeData) return <div className="ps-status"><Oval color="#000" /></div>;
@@ -147,7 +125,9 @@ const PublicStore = ({ slug }) => {
 
   return (
     <div className="ps-wrapper">
-      <div id="google_translate_element" style={{ display: "none" }} />
+      {/* Hide the actual widget but keep it in DOM */}
+      <div id="google_translate_element" style={{ visibility: "hidden", position: "absolute", top: "-9999px" }} />
+      
       <header className="ps-hero">
         <div className="ps-hero-inner">
           <div className="ps-hero-top">
@@ -193,13 +173,9 @@ const PublicStore = ({ slug }) => {
           <section key={cat._id} ref={(el) => (categoryRefs.current[cat._id] = el)} className="ps-section">
             <h2 className="ps-sec-title">{cat.name}</h2>
             {cat.subCategories?.map((sub) => (
-              <div key={sub._id} className={`ps-acc ${openSubCats[sub._id] ? "ps-open" : ""}`}>
-                <div className="ps-acc-head" onClick={() => setOpenSubCats(p => ({ ...p, [sub._id]: !p[sub._id] }))}>
-                  <div>
-                    <span className="ps-acc-name">{sub.name}</span>
-                    <span className="ps-acc-count">{sub.items?.length} items</span>
-                  </div>
-                  <span className="ps-chevron">↓</span>
+              <div key={sub._id} className="ps-acc ps-open">
+                <div className="ps-acc-head">
+                  <span className="ps-acc-name">{sub.name}</span>
                 </div>
                 <div className="ps-acc-content">
                   <div className="ps-grid">
@@ -213,24 +189,6 @@ const PublicStore = ({ slug }) => {
           </section>
         ))}
       </main>
-
-      {selectedItem && (
-        <div className="ps-modal-overlay" onClick={() => setSelectedItem(null)}>
-          <div className="ps-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ps-modal-grid">
-              <div className="ps-modal-img">
-                <img src={selectedItem.image} alt={selectedItem.name} />
-                <button className="ps-close-btn" onClick={() => setSelectedItem(null)}>&times;</button>
-              </div>
-              <div className="ps-modal-info">
-                <h3>{selectedItem.name}</h3>
-                <p>{selectedItem.description}</p>
-                <button className="ps-done-btn" onClick={() => setSelectedItem(null)}>Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -239,9 +197,7 @@ const ProductCard = memo(({ item, onOpen, store }) => {
   const price = item.price || (item.variants?.length ? Math.min(...item.variants.map((v) => v.price)) : 0);
   return (
     <div className={`ps-card ${!item.isAvailable ? "ps-oos" : ""}`} onClick={() => onOpen(item)}>
-      <div className="ps-card-img">
-        <img src={item.image || store.logo} alt={item.name} loading="lazy" />
-      </div>
+      <div className="ps-card-img"><img src={item.image || store.logo} alt={item.name} /></div>
       <div className="ps-card-body">
         <h4>{item.name}</h4>
         <span className="ps-price">₹{price}</span>
