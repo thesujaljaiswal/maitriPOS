@@ -1,4 +1,12 @@
-import { useEffect, useState, useRef, useCallback, memo, useMemo } from "react";
+import {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  memo,
+  useMemo,
+  useLayoutEffect,
+} from "react";
 import logo from "../../assets/maitriPOS ICON 2.jpg";
 import "./style.css";
 import { Oval } from "react-loader-spinner";
@@ -13,22 +21,27 @@ const PublicStore = ({ slug }) => {
   const categoryRefs = useRef({});
 
   /**
-   * ✅ Build safe language list:
-   * - Ensure "en" exists
-   * - Keep English pinned at the top
-   * - Rest alphabetical
+   * ✅ Language list:
+   * - Force English to exist
+   * - Pin English at top so browser never picks Abkhaz as "first option"
+   * - Keep rest alphabetical
    */
   const langsFinal = useMemo(() => {
     const list = Array.isArray(LANGS) ? [...LANGS] : [];
-
     const hasEn = list.some((l) => l?.code === "en");
     if (!hasEn) list.push({ code: "en", label: "English" });
 
-    const en = list.find((l) => l?.code === "en") || { code: "en", label: "English" };
+    const en = list.find((l) => l?.code === "en") || {
+      code: "en",
+      label: "English",
+    };
+
     const rest = list
       .filter((l) => l?.code && l.code !== "en")
       .sort((a, b) =>
-        (a.label || "").localeCompare(b.label || "", "en", { sensitivity: "base" })
+        (a.label || "").localeCompare(b.label || "", "en", {
+          sensitivity: "base",
+        })
       );
 
     return [en, ...rest];
@@ -38,53 +51,131 @@ const PublicStore = ({ slug }) => {
     return new Set(langsFinal.map((l) => l.code));
   }, [langsFinal]);
 
-  // ✅ ALWAYS start in English (never read old localStorage)
+  // ✅ Always start in English (do NOT read old storage)
   const [lang, setLang] = useState("en");
 
-  // ✅ If lang ever becomes invalid, force back to English (prevents first-option fallback)
+  // ✅ Never allow invalid value (prevents <select> fallback to 1st option)
   useEffect(() => {
     if (!allowedLangCodes.has(lang)) setLang("en");
   }, [lang, allowedLangCodes]);
 
-  /* =========================
-     Google Translate HARD RESET
-     ========================= */
-  const resetGoogTransToEnglish = useCallback(() => {
+  /**
+   * ✅ Domain helper:
+   * If you are on store.maitripos.com, cookie might be set on:
+   * - store.maitripos.com
+   * - .maitripos.com   (root domain)
+   * We clear/set both.
+   */
+  const getCookieDomains = useCallback(() => {
+    const host = window.location.hostname; // e.g. store.maitripos.com
+    const parts = host.split(".").filter(Boolean);
+
+    // root domain guess: last 2 parts (maitripos.com)
+    let root = host;
+    if (parts.length >= 2) root = `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
+
+    const domains = new Set();
+    domains.add(host);
+    domains.add(`.${host}`); // sometimes used
+    domains.add(root);
+    domains.add(`.${root}`); // IMPORTANT for subdomain sites
+
+    return Array.from(domains);
+  }, []);
+
+  /**
+   * ✅ Anti auto-translate signals (Chrome + Google)
+   * We inject meta + html attrs to discourage auto translation.
+   */
+  const setNoAutoTranslateSignals = useCallback(() => {
     try {
-      const host = window.location.hostname;
+      // HTML signals
+      document.documentElement.lang = "en";
+      document.documentElement.setAttribute("translate", "no");
+      document.documentElement.classList.add("notranslate");
 
-      // Remove any previous language cookie (both cookie variants)
-      document.cookie =
-        "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
-      document.cookie =
-        `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${host}`;
+      // META: <meta name="google" content="notranslate" />
+      if (!document.querySelector('meta[name="google"][content="notranslate"]')) {
+        const m = document.createElement("meta");
+        m.name = "google";
+        m.content = "notranslate";
+        document.head.appendChild(m);
+      }
 
-      // Force English as default
-      document.cookie = "googtrans=/en/en; path=/";
-      document.cookie = `googtrans=/en/en; path=/; domain=${host}`;
+      // META: Content-Language (extra hint)
+      if (!document.querySelector('meta[http-equiv="Content-Language"]')) {
+        const m2 = document.createElement("meta");
+        m2.setAttribute("http-equiv", "Content-Language");
+        m2.setAttribute("content", "en");
+        document.head.appendChild(m2);
+      }
     } catch (e) {}
   }, []);
 
-  // ✅ Robust apply (waits for widget select to exist)
+  /**
+   * ✅ Hard reset of Google Translate cookie
+   * Clears all variants + forces /en/en
+   */
+  const hardResetGoogTransToEnglish = useCallback(() => {
+    try {
+      const domains = getCookieDomains();
+
+      // Clear old cookie variants
+      const expire = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      const baseClear = `googtrans=; ${expire}; path=/`;
+
+      // Clear for no-domain (current)
+      document.cookie = baseClear;
+
+      // Clear for domain variants
+      domains.forEach((d) => {
+        document.cookie = `${baseClear}; domain=${d}`;
+      });
+
+      // Force English cookie (current + domains)
+      const setBase = "googtrans=/en/en; path=/";
+      document.cookie = setBase;
+      domains.forEach((d) => {
+        document.cookie = `${setBase}; domain=${d}`;
+      });
+    } catch (e) {}
+  }, [getCookieDomains]);
+
+  /**
+   * ✅ Robust translate trigger:
+   * waits for goog-te-combo to exist; retries
+   */
   const applyGoogleLang = useCallback((code, tries = 0) => {
     try {
       const combo = document.querySelector(".goog-te-combo");
       if (!combo) {
-        if (tries < 25) setTimeout(() => applyGoogleLang(code, tries + 1), 200);
+        if (tries < 30) setTimeout(() => applyGoogleLang(code, tries + 1), 150);
         return;
       }
-
       combo.value = code;
       combo.dispatchEvent(new Event("change"));
     } catch (e) {}
   }, []);
 
-  // ✅ Load translate script once; always reset to English on mount
-  useEffect(() => {
-    resetGoogTransToEnglish();
+  /**
+   * ✅ MOST IMPORTANT TIMING FIX:
+   * useLayoutEffect runs earlier than useEffect (before paint)
+   * so we can set meta/html + reset cookie ASAP.
+   */
+  useLayoutEffect(() => {
+    setNoAutoTranslateSignals();
+    hardResetGoogTransToEnglish();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    // If already loaded (SPA), just force English once
+  /**
+   * ✅ Load Google widget ONCE.
+   * After it loads, force English.
+   */
+  useEffect(() => {
+    // If script already exists (SPA navigation), just force English
     if (document.getElementById("google-translate-script")) {
+      hardResetGoogTransToEnglish();
       applyGoogleLang("en");
       return;
     }
@@ -96,7 +187,8 @@ const PublicStore = ({ slug }) => {
         "google_translate_element"
       );
 
-      // Always begin as English
+      // Force English after init
+      hardResetGoogTransToEnglish();
       applyGoogleLang("en");
     };
 
@@ -105,11 +197,11 @@ const PublicStore = ({ slug }) => {
     script.src =
       "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
     document.body.appendChild(script);
-  }, [applyGoogleLang, resetGoogTransToEnglish]);
+  }, [applyGoogleLang, hardResetGoogTransToEnglish]);
 
-  /* =========================
-     Your original fetch logic (unchanged)
-     ========================= */
+  /**
+   * ✅ Your original fetch logic (unchanged UI behavior)
+   */
   const fetchStore = useCallback(async () => {
     try {
       const res = await fetch(
@@ -155,7 +247,10 @@ const PublicStore = ({ slug }) => {
     fetchStore();
   }, [fetchStore]);
 
-  // ✅ After content loads, apply current lang (fixes “sometimes doesn’t work”)
+  /**
+   * ✅ When content loads, apply selected language again
+   * (fixes “sometimes translation doesn’t apply”)
+   */
   useEffect(() => {
     if (!storeData) return;
     applyGoogleLang(lang);
@@ -172,16 +267,13 @@ const PublicStore = ({ slug }) => {
 
   const onChangeLang = (e) => {
     const code = e.target.value;
+    const safe = allowedLangCodes.has(code) ? code : "en";
+    setLang(safe);
 
-    // Safety: if somehow invalid, force English
-    const safeCode = allowedLangCodes.has(code) ? code : "en";
+    // If user chooses English, hard reset cookie too
+    if (safe === "en") hardResetGoogTransToEnglish();
 
-    setLang(safeCode);
-
-    // If English selected, hard reset cookie too
-    if (safeCode === "en") resetGoogTransToEnglish();
-
-    applyGoogleLang(safeCode);
+    applyGoogleLang(safe);
   };
 
   if (error)
@@ -207,13 +299,12 @@ const PublicStore = ({ slug }) => {
 
       <header className="ps-hero">
         <div className="ps-hero-inner">
-          {/* ✅ Language dropdown (NOT translatable) */}
+          {/* Language dropdown (NOT translatable) */}
           <div className="ps-hero-top">
             <div className="ps-lang-wrap notranslate" translate="no">
               <span className="ps-lang-chip notranslate" translate="no">
                 🌐 Language
               </span>
-
               <select
                 className="ps-lang-select notranslate"
                 translate="no"
@@ -379,6 +470,7 @@ const ProductCard = memo(({ item, onOpen, store }) => {
     (item.variants?.length
       ? Math.min(...item.variants.map((v) => v.price))
       : 0);
+
   return (
     <div
       className={`ps-card ${!item.isAvailable ? "ps-oos" : ""}`}
