@@ -20,26 +20,15 @@ const PublicStore = ({ slug }) => {
   const [openSubCats, setOpenSubCats] = useState({});
   const categoryRefs = useRef({});
 
-  /**
-   * ✅ Language list:
-   * - Ensure English exists
-   * - Pin English on top (so first option is never Abkhaz)
-   * - Rest alphabetical
-   */
   const langsFinal = useMemo(() => {
     const list = Array.isArray(LANGS) ? [...LANGS] : [];
     const hasEn = list.some((l) => l?.code === "en");
     if (!hasEn) list.push({ code: "en", label: "English" });
 
-    const en =
-      list.find((l) => l?.code === "en") || ({ code: "en", label: "English" });
+    const en = list.find((l) => l?.code === "en");
     const rest = list
       .filter((l) => l?.code && l.code !== "en")
-      .sort((a, b) =>
-        (a.label || "").localeCompare(b.label || "", "en", {
-          sensitivity: "base",
-        })
-      );
+      .sort((a, b) => (a.label || "").localeCompare(b.label || ""));
 
     return [en, ...rest];
   }, []);
@@ -48,259 +37,137 @@ const PublicStore = ({ slug }) => {
     return new Set(langsFinal.map((l) => l.code));
   }, [langsFinal]);
 
-  // ✅ Always start English (never pick first from dictionary)
   const [lang, setLang] = useState("en");
 
-  // ✅ Keep lang always valid (prevents select fallback)
-  useEffect(() => {
-    if (!allowedLangCodes.has(lang)) setLang("en");
-  }, [lang, allowedLangCodes]);
-
-  /**
-   * ✅ Add only THIS meta to reduce Chrome auto-translate.
-   * IMPORTANT: do NOT set translate="no" on <html> or it blocks widget.
-   */
   useLayoutEffect(() => {
-    try {
-      if (!document.querySelector('meta[name="google"][content="notranslate"]')) {
-        const m = document.createElement("meta");
-        m.name = "google";
-        m.content = "notranslate";
-        document.head.appendChild(m);
-      }
-      // Keep page language hint
-      document.documentElement.lang = "en";
-    } catch (e) {}
+    // Force the document language to English to stop Google's auto-detection
+    document.documentElement.lang = "en";
+    document.documentElement.setAttribute("xml:lang", "en");
+    
+    const meta = document.createElement("meta");
+    meta.name = "google";
+    meta.content = "notranslate";
+    if (!document.querySelector('meta[name="google"]')) {
+      document.head.appendChild(meta);
+    }
   }, []);
 
-  // Domain list for cookie clearing (subdomain + root)
   const getCookieDomains = useCallback(() => {
-    const host = window.location.hostname; // e.g. store.maitripos.com
-    const parts = host.split(".").filter(Boolean);
-
-    let root = host;
-    if (parts.length >= 2)
-      root = `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
-
-    const domains = new Set();
-    domains.add(host);
-    domains.add(root);
-    domains.add(`.${root}`); // important for subdomains
-
-    return Array.from(domains);
+    const host = window.location.hostname;
+    const parts = host.split(".");
+    const domains = [host];
+    if (parts.length >= 2) {
+      const root = parts.slice(-2).join(".");
+      domains.push(root, `.${root}`);
+    }
+    return domains;
   }, []);
 
-  /**
-   * ✅ Reset google translate cookie to English.
-   * This prevents random default like Abkhaz.
-   */
   const resetGoogTransToEnglish = useCallback(() => {
     try {
       const domains = getCookieDomains();
-      const expire = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
-      const clearBase = `googtrans=; ${expire}; path=/`;
-
-      // clear current
-      document.cookie = clearBase;
-      // clear domain variants
+      // Use a very specific path and value to force English-to-English (no translation)
+      const cookieValue = "googtrans=/en/en";
+      const clearValue = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      
       domains.forEach((d) => {
-        document.cookie = `${clearBase}; domain=${d}`;
+        document.cookie = `${clearValue}; path=/; domain=${d}`;
+        document.cookie = `${cookieValue}; path=/; domain=${d}`;
       });
-
-      // set English
-      const setBase = "googtrans=/en/en; path=/";
-      document.cookie = setBase;
-      domains.forEach((d) => {
-        document.cookie = `${setBase}; domain=${d}`;
-      });
+      document.cookie = `${cookieValue}; path=/`;
     } catch (e) {}
   }, [getCookieDomains]);
 
-  /**
-   * ✅ Apply language reliably (wait for widget to create combo)
-   */
-  const applyGoogleLang = useCallback((code, tries = 0) => {
+  const applyGoogleLang = useCallback((code) => {
     try {
       const combo = document.querySelector(".goog-te-combo");
-      if (!combo) {
-        if (tries < 30) setTimeout(() => applyGoogleLang(code, tries + 1), 150);
-        return;
+      if (combo) {
+        combo.value = code;
+        combo.dispatchEvent(new Event("change"));
       }
-      combo.value = code;
-      combo.dispatchEvent(new Event("change"));
     } catch (e) {}
   }, []);
 
-  /**
-   * ✅ Load widget once, always start English.
-   * Also reset cookie BEFORE widget init.
-   */
   useEffect(() => {
+    // 1. Clear existing cookies that might be stuck on Abkhaz
     resetGoogTransToEnglish();
 
-    if (document.getElementById("google-translate-script")) {
-      // widget already exists (SPA navigation)
-      applyGoogleLang("en");
-      return;
-    }
-
     window.googleTranslateElementInit = () => {
-      // eslint-disable-next-line no-undef
       new window.google.translate.TranslateElement(
-        { pageLanguage: "en", autoDisplay: false },
+        {
+          pageLanguage: "en",
+          includedLanguages: Array.from(allowedLangCodes).join(","),
+          layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+          autoDisplay: false,
+        },
         "google_translate_element"
       );
-
-      // ensure English first
-      resetGoogTransToEnglish();
-      applyGoogleLang("en");
+      
+      // Force "English" immediately after initialization
+      setTimeout(() => applyGoogleLang("en"), 500);
     };
 
-    const script = document.createElement("script");
-    script.id = "google-translate-script";
-    script.src =
-      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-    document.body.appendChild(script);
-  }, [applyGoogleLang, resetGoogTransToEnglish]);
+    if (!document.getElementById("google-translate-script")) {
+      const script = document.createElement("script");
+      script.id = "google-translate-script";
+      script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+      document.body.appendChild(script);
+    }
+  }, [allowedLangCodes, applyGoogleLang, resetGoogTransToEnglish]);
 
-  /**
-   * ✅ Fetch store (your original logic)
-   */
   const fetchStore = useCallback(async () => {
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`
-      );
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`);
       if (!res.ok) throw new Error("Store not found");
       const data = await res.json();
-      const store = data.data;
-
-      setStoreData(store);
-
-      if (store.categories?.length > 0)
-        setActiveCategory(store.categories[0]._id);
-
+      setStoreData(data.data);
+      if (data.data.categories?.length > 0) setActiveCategory(data.data.categories[0]._id);
+      
       const initialSubCats = {};
-      store.categories.forEach((cat) => {
-        cat.subCategories?.forEach((sub) => {
-          initialSubCats[sub._id] = true;
-        });
-      });
+      data.data.categories.forEach(cat => cat.subCategories?.forEach(sub => initialSubCats[sub._id] = true));
       setOpenSubCats(initialSubCats);
-
-      document.title = store.store.name;
-
-      const logoUrl = store.store.logo;
-      if (logoUrl) {
-        let link = document.querySelector("link[rel~='icon']");
-        if (!link) {
-          link = document.createElement("link");
-          link.rel = "icon";
-          document.head.appendChild(link);
-        }
-        link.href = logoUrl;
-      }
+      document.title = data.data.store.name;
     } catch (err) {
       setError("Store not found");
     }
   }, [slug]);
 
-  useEffect(() => {
-    fetchStore();
-  }, [fetchStore]);
-
-  /**
-   * ✅ Apply selected language after content loads too
-   */
-  useEffect(() => {
-    if (!storeData) return;
-    applyGoogleLang(lang);
-  }, [storeData, lang, applyGoogleLang]);
-
-  const toggleAccordion = (id) =>
-    setOpenSubCats((p) => ({ ...p, [id]: !p[id] }));
-
-  const scrollToCat = (id) => {
-    setActiveCategory(id);
-    const el = categoryRefs.current[id];
-    if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: "smooth" });
-  };
+  useEffect(() => { fetchStore(); }, [fetchStore]);
 
   const onChangeLang = (e) => {
     const code = e.target.value;
-    const safe = allowedLangCodes.has(code) ? code : "en";
+    setLang(code);
+    applyGoogleLang(code);
+  }, [allowedLangCodes, applyGoogleLang]);
 
-    setLang(safe);
-
-    if (safe === "en") resetGoogTransToEnglish();
-
-    applyGoogleLang(safe);
-  };
-
-  if (error)
-    return (
-      <div className="ps-status">
-        <h2>{error}</h2>
-      </div>
-    );
-
-  if (!storeData)
-    return (
-      <div className="ps-status">
-        <Oval color="#000" />
-      </div>
-    );
+  if (error) return <div className="ps-status"><h2>{error}</h2></div>;
+  if (!storeData) return <div className="ps-status"><Oval color="#000" /></div>;
 
   const { store, categories } = storeData;
 
   return (
     <div className="ps-wrapper">
-      {/* Google widget mount (hidden) */}
-      <div id="google_translate_element" className="ps-gt-hidden" />
-
+      <div id="google_translate_element" style={{ display: "none" }} />
       <header className="ps-hero">
         <div className="ps-hero-inner">
-          {/* Language dropdown - never translate */}
           <div className="ps-hero-top">
-            <div className="ps-lang-wrap notranslate" translate="no">
-              <span className="ps-lang-chip notranslate" translate="no">
-                🌐 Language
-              </span>
-              <select
-                className="ps-lang-select notranslate"
-                translate="no"
-                value={lang}
-                onChange={onChangeLang}
-                aria-label="Select language"
-              >
+            <div className="ps-lang-wrap notranslate">
+              <span className="ps-lang-chip">🌐 Language</span>
+              <select className="ps-lang-select" value={lang} onChange={onChangeLang}>
                 {langsFinal.map((l) => (
-                  <option
-                    key={l.code}
-                    value={l.code}
-                    className="notranslate"
-                    translate="no"
-                  >
-                    {l.label}
-                  </option>
+                  <option key={l.code} value={l.code}>{l.label}</option>
                 ))}
               </select>
             </div>
           </div>
-
           <div className="ps-logo-wrap">
             <img src={store.logo || logo} alt="Logo" className="ps-logo" />
             <span className={`ps-badge ${store.isOnline ? "ps-on" : "ps-off"}`}>
               {store.isOnline ? "Accepting Orders" : "Closed"}
             </span>
           </div>
-
           <h1 className="ps-title">{store.name}</h1>
           <p className="ps-addr">{store.address}</p>
-
-          <div className="ps-links">
-            <a href={`tel:${store.contact.phone}`}>📞 {store.contact.phone}</a>
-            <a href={`mailto:${store.contact.email}`}>✉️ Email Us</a>
-          </div>
         </div>
       </header>
 
@@ -309,10 +176,11 @@ const PublicStore = ({ slug }) => {
           {categories.map((c) => (
             <button
               key={c._id}
-              className={`ps-pill ${
-                activeCategory === c._id ? "ps-pill-active" : ""
-              }`}
-              onClick={() => scrollToCat(c._id)}
+              className={`ps-pill ${activeCategory === c._id ? "ps-pill-active" : ""}`}
+              onClick={() => {
+                setActiveCategory(c._id);
+                window.scrollTo({ top: categoryRefs.current[c._id].offsetTop - 80, behavior: "smooth" });
+              }}
             >
               {c.name}
             </button>
@@ -322,41 +190,22 @@ const PublicStore = ({ slug }) => {
 
       <main className="ps-main">
         {categories.map((cat) => (
-          <section
-            key={cat._id}
-            ref={(el) => (categoryRefs.current[cat._id] = el)}
-            className="ps-section"
-          >
+          <section key={cat._id} ref={(el) => (categoryRefs.current[cat._id] = el)} className="ps-section">
             <h2 className="ps-sec-title">{cat.name}</h2>
             {cat.subCategories?.map((sub) => (
-              <div
-                key={sub._id}
-                className={`ps-acc ${openSubCats[sub._id] ? "ps-open" : ""}`}
-              >
-                <div
-                  className="ps-acc-head"
-                  onClick={() => toggleAccordion(sub._id)}
-                >
+              <div key={sub._id} className={`ps-acc ${openSubCats[sub._id] ? "ps-open" : ""}`}>
+                <div className="ps-acc-head" onClick={() => setOpenSubCats(p => ({ ...p, [sub._id]: !p[sub._id] }))}>
                   <div>
                     <span className="ps-acc-name">{sub.name}</span>
-                    <span className="ps-acc-count">
-                      {sub.items?.length} items
-                    </span>
+                    <span className="ps-acc-count">{sub.items?.length} items</span>
                   </div>
                   <span className="ps-chevron">↓</span>
                 </div>
                 <div className="ps-acc-content">
-                  <div className="ps-acc-inner">
-                    <div className="ps-grid">
-                      {sub.items?.map((item) => (
-                        <ProductCard
-                          key={item._id}
-                          item={item}
-                          onOpen={setSelectedItem}
-                          store={store}
-                        />
-                      ))}
-                    </div>
+                  <div className="ps-grid">
+                    {sub.items?.map((item) => (
+                      <ProductCard key={item._id} item={item} onOpen={setSelectedItem} store={store} />
+                    ))}
                   </div>
                 </div>
               </div>
@@ -365,57 +214,18 @@ const PublicStore = ({ slug }) => {
         ))}
       </main>
 
-      <footer className="ps-footer">
-        <p className="ps-powered-by">
-          Powered by{" "}
-          <a href="https://maitripos.com" target="_blank" rel="noreferrer">
-            maitriPOS.com
-          </a>
-        </p>
-      </footer>
-
       {selectedItem && (
         <div className="ps-modal-overlay" onClick={() => setSelectedItem(null)}>
           <div className="ps-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ps-modal-grid">
               <div className="ps-modal-img">
                 <img src={selectedItem.image} alt={selectedItem.name} />
-                <button
-                  className="ps-close-btn"
-                  onClick={() => setSelectedItem(null)}
-                >
-                  &times;
-                </button>
+                <button className="ps-close-btn" onClick={() => setSelectedItem(null)}>&times;</button>
               </div>
               <div className="ps-modal-info">
-                <div className="ps-modal-header">
-                  <h3>{selectedItem.name}</h3>
-                  <span className="ps-modal-price">
-                    ₹
-                    {selectedItem.price ||
-                      Math.min(...selectedItem.variants.map((v) => v.price))}
-                  </span>
-                </div>
-                <p className="ps-modal-desc">
-                  {selectedItem.description || "No description available."}
-                </p>
-                {selectedItem.variants?.length > 0 && (
-                  <div className="ps-var-list">
-                    <label>Available Options</label>
-                    {selectedItem.variants.map((v) => (
-                      <div key={v._id} className="ps-var-row">
-                        <span>{v.name}</span>
-                        <b>₹{v.price}</b>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <button
-                  className="ps-done-btn"
-                  onClick={() => setSelectedItem(null)}
-                >
-                  Close
-                </button>
+                <h3>{selectedItem.name}</h3>
+                <p>{selectedItem.description}</p>
+                <button className="ps-done-btn" onClick={() => setSelectedItem(null)}>Close</button>
               </div>
             </div>
           </div>
@@ -426,28 +236,15 @@ const PublicStore = ({ slug }) => {
 };
 
 const ProductCard = memo(({ item, onOpen, store }) => {
-  const price =
-    item.price ||
-    (item.variants?.length
-      ? Math.min(...item.variants.map((v) => v.price))
-      : 0);
-
+  const price = item.price || (item.variants?.length ? Math.min(...item.variants.map((v) => v.price)) : 0);
   return (
-    <div
-      className={`ps-card ${!item.isAvailable ? "ps-oos" : ""}`}
-      onClick={() => onOpen(item)}
-    >
+    <div className={`ps-card ${!item.isAvailable ? "ps-oos" : ""}`} onClick={() => onOpen(item)}>
       <div className="ps-card-img">
         <img src={item.image || store.logo} alt={item.name} loading="lazy" />
       </div>
       <div className="ps-card-body">
         <h4>{item.name}</h4>
-        <div className="ps-card-foot">
-          <span className="ps-price">
-            ₹{price}
-            {item.variants?.length > 0 ? " onwards" : ""}
-          </span>
-        </div>
+        <span className="ps-price">₹{price}</span>
       </div>
     </div>
   );
