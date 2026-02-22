@@ -13,7 +13,8 @@ import LANGS from "./language.json";
 
 const GT_SCRIPT_ID = "google-translate-script";
 const GT_ELEM_ID = "google_translate_element";
-const LANG_STORAGE_KEY = "ps_lang"; // ✅ persist your last selected language reliably
+const LANG_COOKIE = "mt_lang";
+const GT_COOKIE = "googtrans";
 
 const PublicStore = ({ slug }) => {
   const [storeData, setStoreData] = useState(null);
@@ -22,19 +23,17 @@ const PublicStore = ({ slug }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [openSubCats, setOpenSubCats] = useState({});
   const categoryRefs = useRef({});
-  const [gtReady, setGtReady] = useState(false);
 
-  // --- Languages (stable order) ---
+  // --- Languages list (English always present + first) ---
   const langsFinal = useMemo(() => {
     const list = Array.isArray(LANGS) ? [...LANGS] : [];
-    const hasEn = list.some((l) => l?.code === "en");
-    if (!hasEn) list.push({ code: "en", label: "English" });
+    if (!list.some((l) => l?.code === "en"))
+      list.push({ code: "en", label: "English" });
 
     const en = list.find((l) => l?.code === "en") || {
       code: "en",
       label: "English",
     };
-
     const rest = list
       .filter((l) => l?.code && l.code !== "en")
       .sort((a, b) =>
@@ -51,25 +50,23 @@ const PublicStore = ({ slug }) => {
     [langsFinal],
   );
 
-  // ✅ IMPORTANT: use langsFinal order (NOT Set order) so Google doesn't pick random "first"
-  const includedLanguages = useMemo(() => {
-    // NOTE: pageLanguage is "en", so we can exclude "en" to avoid odd behavior
-    return langsFinal
-      .map((l) => l.code)
-      .filter((c) => c && c !== "en")
-      .join(",");
-  }, [langsFinal]);
-
-  // --- Cookie helpers ---
+  // --- Cookie helpers (clear/set across domain variations) ---
   const getCookieDomains = useCallback(() => {
     const host = window.location.hostname;
     const parts = host.split(".").filter(Boolean);
-    if (parts.length < 2 || host === "localhost") return [null];
+
+    if (host === "localhost" || parts.length < 2) return [null];
+
     const root = `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
     return [host, `.${root}`, root, null];
   }, []);
 
-  const setCookie = useCallback(
+  const readCookie = useCallback((name) => {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : "";
+  }, []);
+
+  const setCookieEverywhere = useCallback(
     (name, value, days = 365) => {
       const maxAge = days * 24 * 60 * 60;
       const base = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; samesite=lax`;
@@ -82,53 +79,46 @@ const PublicStore = ({ slug }) => {
     [getCookieDomains],
   );
 
-  const readCookie = useCallback((name) => {
-    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-    return match ? decodeURIComponent(match[1]) : "";
-  }, []);
+  const clearCookieEverywhere = useCallback(
+    (name) => {
+      const domains = getCookieDomains();
+      const expire = `expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; samesite=lax`;
+      domains.forEach((d) => {
+        if (d) document.cookie = `${name}=; ${expire}; domain=${d}`;
+        else document.cookie = `${name}=; ${expire}`;
+      });
 
-  const getLangFromCookie = useCallback(() => {
-    const raw = readCookie("googtrans"); // "/en/hi"
-    const m = raw.match(/^\/en\/([^/]+)$/);
-    const code = m?.[1];
-    if (code && allowedLangCodes.has(code)) return code;
-    return "en";
-  }, [readCookie, allowedLangCodes]);
+      // extra safety: some browsers store a path-less variant
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    },
+    [getCookieDomains],
+  );
 
-  // ✅ Choose language in this priority:
-  // 1) localStorage (your own setting) -> stable and under your control
-  // 2) googtrans cookie (if user came back from same browser)
-  // 3) fallback "en"
-  const [lang, setLang] = useState(() => {
+  // --- Hard reset (THIS is what removes “sticky Afrikaans”) ---
+  const hardResetToEnglish = useCallback(() => {
     try {
-      const ls = localStorage.getItem(LANG_STORAGE_KEY);
-      if (ls && allowedLangCodes.has(ls)) return ls;
+      // 1) kill googtrans everywhere, then force /en/en
+      clearCookieEverywhere(GT_COOKIE);
+      setCookieEverywhere(GT_COOKIE, "/en/en");
+
+      // 2) remove translated state from DOM
+      document.documentElement.classList.remove("translated-ltr");
+      document.documentElement.classList.remove("translated-rtl");
+
+      // banner iframe + any leftovers
+      const banner = document.querySelector(".goog-te-banner-frame");
+      if (banner) banner.remove();
+
+      // reset body offset caused by banner
+      if (document.body) document.body.style.top = "0px";
+
+      // Google also injects this sometimes
+      const skip = document.getElementById(":1.container");
+      if (skip) skip.remove();
     } catch (e) {}
-    return "en";
-  });
+  }, [clearCookieEverywhere, setCookieEverywhere]);
 
-  // When allowedLangCodes becomes available, re-validate language once.
-  useEffect(() => {
-    let next = "en";
-    try {
-      const ls = localStorage.getItem(LANG_STORAGE_KEY);
-      if (ls && allowedLangCodes.has(ls)) next = ls;
-      else {
-        const ck = getLangFromCookie();
-        if (ck && allowedLangCodes.has(ck)) next = ck;
-      }
-    } catch (e) {
-      const ck = getLangFromCookie();
-      if (ck && allowedLangCodes.has(ck)) next = ck;
-    }
-
-    setLang(next);
-
-    // ✅ Force English as default if nothing stored (prevents Afrikaans/random start)
-    setCookie("googtrans", `/en/${next}`);
-  }, [allowedLangCodes, getLangFromCookie, setCookie]);
-
-  // --- Apply language to Google Translate dropdown when available ---
+  // --- Apply lang to Google Translate widget (when combo exists) ---
   const applyGoogleLang = useCallback((code, tries = 0) => {
     try {
       const combo = document.querySelector(".goog-te-combo");
@@ -139,18 +129,33 @@ const PublicStore = ({ slug }) => {
       if (combo.value !== code) {
         combo.value = code;
         combo.dispatchEvent(new Event("change"));
+        combo.dispatchEvent(new Event("blur"));
       }
     } catch (e) {}
   }, []);
 
-  // --- Ensure html lang ---
+  const [gtReady, setGtReady] = useState(false);
+  const [lang, setLang] = useState("en");
+
+  // ✅ Source of truth: mt_lang ONLY (never trust googtrans)
+  useEffect(() => {
+    const saved = readCookie(LANG_COOKIE);
+    const next = saved && allowedLangCodes.has(saved) ? saved : "en";
+
+    // If no saved lang OR invalid -> force clean English (prevents Afrikaans start)
+    if (next === "en") hardResetToEnglish();
+
+    setLang(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowedLangCodes]);
+
   useEffect(() => {
     try {
       document.documentElement.lang = "en";
     } catch (e) {}
   }, []);
 
-  // ✅ Init Google Translate (only once)
+  // --- Load + init Google Translate once ---
   useEffect(() => {
     const init = () => {
       try {
@@ -166,8 +171,7 @@ const PublicStore = ({ slug }) => {
           {
             pageLanguage: "en",
             autoDisplay: false,
-            // ✅ stable order list, and excluding "en"
-            includedLanguages,
+            includedLanguages: Array.from(allowedLangCodes).join(","),
           },
           GT_ELEM_ID,
         );
@@ -199,32 +203,31 @@ const PublicStore = ({ slug }) => {
       }, 200);
       return () => clearInterval(t);
     }
-  }, [includedLanguages]);
+  }, [allowedLangCodes]);
 
-  // ✅ Persist + apply on every lang change
+  // ✅ On lang change: persist mt_lang, set googtrans properly, and *fully revert* for English
   useEffect(() => {
-    // store selection for next loads
-    try {
-      localStorage.setItem(LANG_STORAGE_KEY, lang);
-    } catch (e) {}
+    setCookieEverywhere(LANG_COOKIE, lang);
 
-    // set googtrans cookie BEFORE apply (so reload keeps it)
-    setCookie("googtrans", `/en/${lang}`);
-
-    // apply to widget (works even if widget loads later)
-    applyGoogleLang(lang);
-
-    // extra nudge right after GT becomes ready (helps stop random starting language)
-    if (gtReady) {
-      setTimeout(() => applyGoogleLang(lang), 250);
-      setTimeout(() => applyGoogleLang(lang), 900);
+    if (lang === "en") {
+      // This is the critical part:
+      hardResetToEnglish();
+      // after reset, still try to set combo to en
+      applyGoogleLang("en");
+      return;
     }
-  }, [lang, gtReady, setCookie, applyGoogleLang]);
 
-  // ✅ Favicon (logo in title/tab)
-  const setFavicon = useCallback((iconUrl) => {
+    // non-English -> set googtrans + apply
+    setCookieEverywhere(GT_COOKIE, `/en/${lang}`);
+    applyGoogleLang(lang);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang, gtReady]);
+
+  // ✅ favicon as store logo
+  const setFavicon = useCallback((href) => {
     try {
-      const href = iconUrl || logo;
+      if (!href) return;
+
       let link =
         document.querySelector("link[rel='icon']") ||
         document.querySelector("link[rel='shortcut icon']");
@@ -235,10 +238,8 @@ const PublicStore = ({ slug }) => {
         document.head.appendChild(link);
       }
 
-      // cache-bust so browser updates
-      const bust = `v=${Date.now()}`;
-      link.href = href.includes("?") ? `${href}&${bust}` : `${href}?${bust}`;
       link.type = "image/png";
+      link.href = href;
     } catch (e) {}
   }, []);
 
@@ -250,23 +251,22 @@ const PublicStore = ({ slug }) => {
       if (!res.ok) throw new Error("Store not found");
 
       const data = await res.json();
-      setStoreData(data.data);
+      const sd = data.data;
 
-      if (data.data.categories?.length > 0) {
-        setActiveCategory(data.data.categories[0]._id);
-      }
+      setStoreData(sd);
+
+      if (sd.categories?.length > 0) setActiveCategory(sd.categories[0]._id);
 
       const initialSubCats = {};
-      data.data.categories?.forEach((cat) => {
+      sd.categories?.forEach((cat) => {
         cat.subCategories?.forEach((sub) => {
           initialSubCats[sub._id] = true;
         });
       });
       setOpenSubCats(initialSubCats);
 
-      // ✅ title + favicon
-      document.title = data.data.store?.name || "Store";
-      setFavicon(data.data.store?.logo || logo);
+      document.title = sd?.store?.name || "Store";
+      setFavicon(sd?.store?.logo || logo);
     } catch (err) {
       setError("Store not found");
     }
@@ -282,29 +282,27 @@ const PublicStore = ({ slug }) => {
     setLang(code);
   };
 
-  if (error)
+  if (error) {
     return (
       <div className="ps-status">
         <h2>{error}</h2>
       </div>
     );
+  }
 
-  if (!storeData)
+  if (!storeData) {
     return (
       <div className="ps-status">
         <Oval color="#000" />
       </div>
     );
+  }
 
   const { store, categories } = storeData;
 
   return (
     <div className="ps-wrapper">
-      <div
-        id={GT_ELEM_ID}
-        className="ps-gt-hidden"
-        style={{ display: "none" }}
-      />
+      <div id={GT_ELEM_ID} style={{ display: "none" }} />
 
       <header className="ps-hero">
         <div className="ps-hero-inner">
