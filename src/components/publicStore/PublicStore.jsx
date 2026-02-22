@@ -11,20 +11,9 @@ import "./style.css";
 import { Oval } from "react-loader-spinner";
 import LANGS from "./language.json";
 
-/**
- * ✅ Fixes in this version:
- * 1) Stops starting in Afrikaans (or any random lang):
- *    - Uses OUR cookie `mt_lang` as the source of truth.
- *    - If mt_lang missing/invalid -> defaults to English.
- *    - Also forces Google Translate cookie to /en/en when defaulting to English.
- *
- * 2) Sets the store logo as the browser tab icon (favicon) on load.
- */
-
 const GT_SCRIPT_ID = "google-translate-script";
 const GT_ELEM_ID = "google_translate_element";
-const LANG_COOKIE = "mt_lang"; // ✅ our own cookie (stable)
-const GT_COOKIE = "googtrans"; // Google uses this
+const LANG_STORAGE_KEY = "ps_lang"; // ✅ persist your last selected language reliably
 
 const PublicStore = ({ slug }) => {
   const [storeData, setStoreData] = useState(null);
@@ -33,8 +22,9 @@ const PublicStore = ({ slug }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [openSubCats, setOpenSubCats] = useState({});
   const categoryRefs = useRef({});
+  const [gtReady, setGtReady] = useState(false);
 
-  // --- Languages: ensure English exists and is first ---
+  // --- Languages (stable order) ---
   const langsFinal = useMemo(() => {
     const list = Array.isArray(LANGS) ? [...LANGS] : [];
     const hasEn = list.some((l) => l?.code === "en");
@@ -61,14 +51,20 @@ const PublicStore = ({ slug }) => {
     [langsFinal],
   );
 
-  // --- Cookie helpers (domain-safe) ---
+  // ✅ IMPORTANT: use langsFinal order (NOT Set order) so Google doesn't pick random "first"
+  const includedLanguages = useMemo(() => {
+    // NOTE: pageLanguage is "en", so we can exclude "en" to avoid odd behavior
+    return langsFinal
+      .map((l) => l.code)
+      .filter((c) => c && c !== "en")
+      .join(",");
+  }, [langsFinal]);
+
+  // --- Cookie helpers ---
   const getCookieDomains = useCallback(() => {
     const host = window.location.hostname;
     const parts = host.split(".").filter(Boolean);
-
-    // localhost / ip: only no-domain cookie works
-    if (host === "localhost" || parts.length < 2) return [null];
-
+    if (parts.length < 2 || host === "localhost") return [null];
     const root = `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
     return [host, `.${root}`, root, null];
   }, []);
@@ -76,11 +72,8 @@ const PublicStore = ({ slug }) => {
   const setCookie = useCallback(
     (name, value, days = 365) => {
       const maxAge = days * 24 * 60 * 60;
-      const base = `${name}=${encodeURIComponent(
-        value,
-      )}; path=/; max-age=${maxAge}; samesite=lax`;
+      const base = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; samesite=lax`;
       const domains = getCookieDomains();
-
       domains.forEach((d) => {
         if (d) document.cookie = `${base}; domain=${d}`;
         else document.cookie = base;
@@ -94,7 +87,48 @@ const PublicStore = ({ slug }) => {
     return match ? decodeURIComponent(match[1]) : "";
   }, []);
 
-  // ✅ Apply language to Google Translate dropdown when available
+  const getLangFromCookie = useCallback(() => {
+    const raw = readCookie("googtrans"); // "/en/hi"
+    const m = raw.match(/^\/en\/([^/]+)$/);
+    const code = m?.[1];
+    if (code && allowedLangCodes.has(code)) return code;
+    return "en";
+  }, [readCookie, allowedLangCodes]);
+
+  // ✅ Choose language in this priority:
+  // 1) localStorage (your own setting) -> stable and under your control
+  // 2) googtrans cookie (if user came back from same browser)
+  // 3) fallback "en"
+  const [lang, setLang] = useState(() => {
+    try {
+      const ls = localStorage.getItem(LANG_STORAGE_KEY);
+      if (ls && allowedLangCodes.has(ls)) return ls;
+    } catch (e) {}
+    return "en";
+  });
+
+  // When allowedLangCodes becomes available, re-validate language once.
+  useEffect(() => {
+    let next = "en";
+    try {
+      const ls = localStorage.getItem(LANG_STORAGE_KEY);
+      if (ls && allowedLangCodes.has(ls)) next = ls;
+      else {
+        const ck = getLangFromCookie();
+        if (ck && allowedLangCodes.has(ck)) next = ck;
+      }
+    } catch (e) {
+      const ck = getLangFromCookie();
+      if (ck && allowedLangCodes.has(ck)) next = ck;
+    }
+
+    setLang(next);
+
+    // ✅ Force English as default if nothing stored (prevents Afrikaans/random start)
+    setCookie("googtrans", `/en/${next}`);
+  }, [allowedLangCodes, getLangFromCookie, setCookie]);
+
+  // --- Apply language to Google Translate dropdown when available ---
   const applyGoogleLang = useCallback((code, tries = 0) => {
     try {
       const combo = document.querySelector(".goog-te-combo");
@@ -102,41 +136,21 @@ const PublicStore = ({ slug }) => {
         if (tries < 80) setTimeout(() => applyGoogleLang(code, tries + 1), 150);
         return;
       }
-
       if (combo.value !== code) {
         combo.value = code;
         combo.dispatchEvent(new Event("change"));
-        combo.dispatchEvent(new Event("blur"));
       }
     } catch (e) {}
   }, []);
 
-  const [gtReady, setGtReady] = useState(false);
-
-  // ✅ Language state starts as English ALWAYS (then we read OUR cookie)
-  const [lang, setLang] = useState("en");
-
-  // ✅ Read OUR cookie on mount (NOT googtrans)
-  useEffect(() => {
-    const saved = readCookie(LANG_COOKIE);
-    const next = saved && allowedLangCodes.has(saved) ? saved : "en";
-    setLang(next);
-
-    // If no saved language, force translate OFF (prevents random Afrikaans start)
-    if (!saved || !allowedLangCodes.has(saved)) {
-      setCookie(GT_COOKIE, "/en/en");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allowedLangCodes]);
-
-  // --- Ensure HTML lang is stable ---
+  // --- Ensure html lang ---
   useEffect(() => {
     try {
       document.documentElement.lang = "en";
     } catch (e) {}
   }, []);
 
-  // --- Load Google Translate script once and init widget once ---
+  // ✅ Init Google Translate (only once)
   useEffect(() => {
     const init = () => {
       try {
@@ -146,14 +160,14 @@ const PublicStore = ({ slug }) => {
           setGtReady(true);
           return;
         }
-
         window.__GT_INITIALIZED__ = true;
 
         new window.google.translate.TranslateElement(
           {
             pageLanguage: "en",
             autoDisplay: false,
-            includedLanguages: Array.from(allowedLangCodes).join(","),
+            // ✅ stable order list, and excluding "en"
+            includedLanguages,
           },
           GT_ELEM_ID,
         );
@@ -183,31 +197,34 @@ const PublicStore = ({ slug }) => {
           init();
         }
       }, 200);
-
       return () => clearInterval(t);
     }
-  }, [allowedLangCodes]);
+  }, [includedLanguages]);
 
-  // ✅ Persist + apply language whenever it changes
+  // ✅ Persist + apply on every lang change
   useEffect(() => {
-    // persist OUR cookie
-    setCookie(LANG_COOKIE, lang);
-
-    // set Google cookie (en => translate off)
-    setCookie(GT_COOKIE, `/en/${lang === "en" ? "en" : lang}`);
-
-    // apply even if widget loads later
-    applyGoogleLang(lang === "en" ? "en" : lang);
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang, gtReady]);
-
-  // ✅ Set favicon (store logo in title tab)
-  const setFavicon = useCallback((href) => {
+    // store selection for next loads
     try {
-      if (!href) return;
+      localStorage.setItem(LANG_STORAGE_KEY, lang);
+    } catch (e) {}
 
-      // pick existing icon link, else create one
+    // set googtrans cookie BEFORE apply (so reload keeps it)
+    setCookie("googtrans", `/en/${lang}`);
+
+    // apply to widget (works even if widget loads later)
+    applyGoogleLang(lang);
+
+    // extra nudge right after GT becomes ready (helps stop random starting language)
+    if (gtReady) {
+      setTimeout(() => applyGoogleLang(lang), 250);
+      setTimeout(() => applyGoogleLang(lang), 900);
+    }
+  }, [lang, gtReady, setCookie, applyGoogleLang]);
+
+  // ✅ Favicon (logo in title/tab)
+  const setFavicon = useCallback((iconUrl) => {
+    try {
+      const href = iconUrl || logo;
       let link =
         document.querySelector("link[rel='icon']") ||
         document.querySelector("link[rel='shortcut icon']");
@@ -218,8 +235,10 @@ const PublicStore = ({ slug }) => {
         document.head.appendChild(link);
       }
 
+      // cache-bust so browser updates
+      const bust = `v=${Date.now()}`;
+      link.href = href.includes("?") ? `${href}&${bust}` : `${href}?${bust}`;
       link.type = "image/png";
-      link.href = href;
     } catch (e) {}
   }, []);
 
@@ -231,14 +250,14 @@ const PublicStore = ({ slug }) => {
       if (!res.ok) throw new Error("Store not found");
 
       const data = await res.json();
-      const sd = data.data;
+      setStoreData(data.data);
 
-      setStoreData(sd);
-
-      if (sd.categories?.length > 0) setActiveCategory(sd.categories[0]._id);
+      if (data.data.categories?.length > 0) {
+        setActiveCategory(data.data.categories[0]._id);
+      }
 
       const initialSubCats = {};
-      sd.categories?.forEach((cat) => {
+      data.data.categories?.forEach((cat) => {
         cat.subCategories?.forEach((sub) => {
           initialSubCats[sub._id] = true;
         });
@@ -246,8 +265,8 @@ const PublicStore = ({ slug }) => {
       setOpenSubCats(initialSubCats);
 
       // ✅ title + favicon
-      document.title = sd?.store?.name || "Store";
-      setFavicon(sd?.store?.logo || logo);
+      document.title = data.data.store?.name || "Store";
+      setFavicon(data.data.store?.logo || logo);
     } catch (err) {
       setError("Store not found");
     }
@@ -281,8 +300,11 @@ const PublicStore = ({ slug }) => {
 
   return (
     <div className="ps-wrapper">
-      {/* must exist for widget */}
-      <div id={GT_ELEM_ID} style={{ display: "none" }} />
+      <div
+        id={GT_ELEM_ID}
+        className="ps-gt-hidden"
+        style={{ display: "none" }}
+      />
 
       <header className="ps-hero">
         <div className="ps-hero-inner">
@@ -327,9 +349,7 @@ const PublicStore = ({ slug }) => {
           {categories.map((c) => (
             <button
               key={c._id}
-              className={`ps-pill ${
-                activeCategory === c._id ? "ps-pill-active" : ""
-              }`}
+              className={`ps-pill ${activeCategory === c._id ? "ps-pill-active" : ""}`}
               onClick={() => {
                 setActiveCategory(c._id);
                 const el = categoryRefs.current[c._id];
