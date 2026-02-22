@@ -12,18 +12,19 @@ import { Oval } from "react-loader-spinner";
 import LANGS from "./language.json";
 
 /**
- * ✅ Production-safe Google Translate integration
- * Fixes:
- * - Removes global "notranslate" meta (it was blocking ALL translations)
- * - Persists selected language properly (cookie across reloads)
- * - Applies language whenever user changes dropdown (even if widget loads later)
- * - Avoids clearing cookies on unmount (which caused random fallback/default)
- * - Ensures English exists + sorts languages nicely
- * - Handles script loading only once
+ * ✅ Fixes in this version:
+ * 1) Stops starting in Afrikaans (or any random lang):
+ *    - Uses OUR cookie `mt_lang` as the source of truth.
+ *    - If mt_lang missing/invalid -> defaults to English.
+ *    - Also forces Google Translate cookie to /en/en when defaulting to English.
+ *
+ * 2) Sets the store logo as the browser tab icon (favicon) on load.
  */
 
 const GT_SCRIPT_ID = "google-translate-script";
 const GT_ELEM_ID = "google_translate_element";
+const LANG_COOKIE = "mt_lang"; // ✅ our own cookie (stable)
+const GT_COOKIE = "googtrans"; // Google uses this
 
 const PublicStore = ({ slug }) => {
   const [storeData, setStoreData] = useState(null);
@@ -33,7 +34,7 @@ const PublicStore = ({ slug }) => {
   const [openSubCats, setOpenSubCats] = useState({});
   const categoryRefs = useRef({});
 
-  // --- Languages: ensure English is present and first ---
+  // --- Languages: ensure English exists and is first ---
   const langsFinal = useMemo(() => {
     const list = Array.isArray(LANGS) ? [...LANGS] : [];
     const hasEn = list.some((l) => l?.code === "en");
@@ -60,21 +61,24 @@ const PublicStore = ({ slug }) => {
     [langsFinal],
   );
 
-  // --- Cookie helpers (works across subdomains too) ---
+  // --- Cookie helpers (domain-safe) ---
   const getCookieDomains = useCallback(() => {
     const host = window.location.hostname;
     const parts = host.split(".").filter(Boolean);
-    // If host is localhost or IP, domain cookie is not valid; return only host + no-domain
-    if (parts.length < 2 || host === "localhost") return [null];
+
+    // localhost / ip: only no-domain cookie works
+    if (host === "localhost" || parts.length < 2) return [null];
 
     const root = `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
-    return [host, `.${root}`, root, null]; // include null for no-domain set
+    return [host, `.${root}`, root, null];
   }, []);
 
   const setCookie = useCallback(
     (name, value, days = 365) => {
       const maxAge = days * 24 * 60 * 60;
-      const base = `${name}=${value}; path=/; max-age=${maxAge}; samesite=lax`;
+      const base = `${name}=${encodeURIComponent(
+        value,
+      )}; path=/; max-age=${maxAge}; samesite=lax`;
       const domains = getCookieDomains();
 
       domains.forEach((d) => {
@@ -90,43 +94,40 @@ const PublicStore = ({ slug }) => {
     return match ? decodeURIComponent(match[1]) : "";
   }, []);
 
-  // googtrans format: /en/<target>
-  const getLangFromCookie = useCallback(() => {
-    const raw = readCookie("googtrans"); // e.g. "/en/hi"
-    const m = raw.match(/^\/en\/([^/]+)$/);
-    const code = m?.[1];
-    if (code && allowedLangCodes.has(code)) return code;
-    return "en";
-  }, [readCookie, allowedLangCodes]);
-
-  const [lang, setLang] = useState(() => "en");
-  const [gtReady, setGtReady] = useState(false);
-
-  // Initialize lang from cookie on first mount (after allowedLangCodes is ready)
-  useEffect(() => {
-    setLang(getLangFromCookie());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allowedLangCodes]);
-
-  // --- Apply language to Google Translate dropdown when available ---
+  // ✅ Apply language to Google Translate dropdown when available
   const applyGoogleLang = useCallback((code, tries = 0) => {
     try {
       const combo = document.querySelector(".goog-te-combo");
       if (!combo) {
-        if (tries < 60) setTimeout(() => applyGoogleLang(code, tries + 1), 150);
+        if (tries < 80) setTimeout(() => applyGoogleLang(code, tries + 1), 150);
         return;
       }
 
-      // some browsers need focus/blur to trigger properly
       if (combo.value !== code) {
         combo.value = code;
         combo.dispatchEvent(new Event("change"));
         combo.dispatchEvent(new Event("blur"));
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }, []);
+
+  const [gtReady, setGtReady] = useState(false);
+
+  // ✅ Language state starts as English ALWAYS (then we read OUR cookie)
+  const [lang, setLang] = useState("en");
+
+  // ✅ Read OUR cookie on mount (NOT googtrans)
+  useEffect(() => {
+    const saved = readCookie(LANG_COOKIE);
+    const next = saved && allowedLangCodes.has(saved) ? saved : "en";
+    setLang(next);
+
+    // If no saved language, force translate OFF (prevents random Afrikaans start)
+    if (!saved || !allowedLangCodes.has(saved)) {
+      setCookie(GT_COOKIE, "/en/en");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowedLangCodes]);
 
   // --- Ensure HTML lang is stable ---
   useEffect(() => {
@@ -137,12 +138,10 @@ const PublicStore = ({ slug }) => {
 
   // --- Load Google Translate script once and init widget once ---
   useEffect(() => {
-    // If translate element already exists, don't recreate it.
     const init = () => {
       try {
         if (!window.google?.translate?.TranslateElement) return;
 
-        // Prevent double init
         if (window.__GT_INITIALIZED__) {
           setGtReady(true);
           return;
@@ -160,21 +159,16 @@ const PublicStore = ({ slug }) => {
         );
 
         setGtReady(true);
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     };
 
-    // Google calls this by cb=googleTranslateElementInit
     window.googleTranslateElementInit = init;
 
-    // If script already loaded earlier, just init now
     if (window.google?.translate?.TranslateElement) {
       init();
       return;
     }
 
-    // Inject script only once
     if (!document.getElementById(GT_SCRIPT_ID)) {
       const script = document.createElement("script");
       script.id = GT_SCRIPT_ID;
@@ -183,7 +177,6 @@ const PublicStore = ({ slug }) => {
       script.async = true;
       document.body.appendChild(script);
     } else {
-      // script tag exists, wait a bit for it to define window.google
       const t = setInterval(() => {
         if (window.google?.translate?.TranslateElement) {
           clearInterval(t);
@@ -195,17 +188,40 @@ const PublicStore = ({ slug }) => {
     }
   }, [allowedLangCodes]);
 
-  // --- Persist + apply language whenever it changes ---
+  // ✅ Persist + apply language whenever it changes
   useEffect(() => {
-    // Persist across reloads
-    setCookie("googtrans", `/en/${lang}`);
+    // persist OUR cookie
+    setCookie(LANG_COOKIE, lang);
 
-    // Apply to widget (even if it loads late)
-    if (gtReady) applyGoogleLang(lang);
-    else applyGoogleLang(lang); // will retry until combo exists
+    // set Google cookie (en => translate off)
+    setCookie(GT_COOKIE, `/en/${lang === "en" ? "en" : lang}`);
+
+    // apply even if widget loads later
+    applyGoogleLang(lang === "en" ? "en" : lang);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang, gtReady]);
+
+  // ✅ Set favicon (store logo in title tab)
+  const setFavicon = useCallback((href) => {
+    try {
+      if (!href) return;
+
+      // pick existing icon link, else create one
+      let link =
+        document.querySelector("link[rel='icon']") ||
+        document.querySelector("link[rel='shortcut icon']");
+
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+
+      link.type = "image/png";
+      link.href = href;
+    } catch (e) {}
+  }, []);
 
   const fetchStore = useCallback(async () => {
     try {
@@ -213,26 +229,29 @@ const PublicStore = ({ slug }) => {
         `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`,
       );
       if (!res.ok) throw new Error("Store not found");
-      const data = await res.json();
-      setStoreData(data.data);
 
-      if (data.data.categories?.length > 0) {
-        setActiveCategory(data.data.categories[0]._id);
-      }
+      const data = await res.json();
+      const sd = data.data;
+
+      setStoreData(sd);
+
+      if (sd.categories?.length > 0) setActiveCategory(sd.categories[0]._id);
 
       const initialSubCats = {};
-      data.data.categories?.forEach((cat) => {
+      sd.categories?.forEach((cat) => {
         cat.subCategories?.forEach((sub) => {
           initialSubCats[sub._id] = true;
         });
       });
       setOpenSubCats(initialSubCats);
 
-      document.title = data.data.store.name;
+      // ✅ title + favicon
+      document.title = sd?.store?.name || "Store";
+      setFavicon(sd?.store?.logo || logo);
     } catch (err) {
       setError("Store not found");
     }
-  }, [slug]);
+  }, [slug, setFavicon]);
 
   useEffect(() => {
     fetchStore();
@@ -262,17 +281,12 @@ const PublicStore = ({ slug }) => {
 
   return (
     <div className="ps-wrapper">
-      {/* keep hidden, but must exist */}
-      <div
-        id={GT_ELEM_ID}
-        className="ps-gt-hidden"
-        style={{ display: "none" }}
-      />
+      {/* must exist for widget */}
+      <div id={GT_ELEM_ID} style={{ display: "none" }} />
 
       <header className="ps-hero">
         <div className="ps-hero-inner">
           <div className="ps-hero-top">
-            {/* keep dropdown not translated */}
             <div className="ps-lang-wrap notranslate" translate="no">
               <span className="ps-lang-chip">🌐 Language</span>
               <select
@@ -384,13 +398,7 @@ const PublicStore = ({ slug }) => {
       <footer className="ps-footer notranslate" translate="no">
         <p className="ps-powered-by">
           Powered by{" "}
-          <a
-            href="https://maitripos.com"
-            target="_blank"
-            rel="noreferrer"
-            className="notranslate"
-            translate="no"
-          >
+          <a href="https://maitripos.com" target="_blank" rel="noreferrer">
             maitripos.com
           </a>
         </p>
