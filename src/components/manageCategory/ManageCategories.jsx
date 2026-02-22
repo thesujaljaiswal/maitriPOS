@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./style.css";
 import Layout from "../Layout";
+import Footer from "../footer/Footer";
 
 const ManageCategory = () => {
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ const ManageCategory = () => {
     try {
       const storeRes = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/store/me`,
-        { credentials: "include" }
+        { credentials: "include" },
       );
       const storeData = await storeRes.json();
       if (!storeRes.ok || !storeData.data?.length)
@@ -58,7 +59,7 @@ const ManageCategory = () => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/categories/${targetId}`,
-        { credentials: "include" }
+        { credentials: "include" },
       );
       const data = await res.json();
       setCategories(data.data || []);
@@ -82,7 +83,7 @@ const ManageCategory = () => {
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify(categoryForm),
-        }
+        },
       );
       if (!res.ok) throw new Error("Failed to create category");
       setCategoryForm({ name: "", description: "" });
@@ -112,7 +113,7 @@ const ManageCategory = () => {
             name: subCategoryForm.name,
             description: subCategoryForm.description,
           }),
-        }
+        },
       );
       if (!res.ok) throw new Error("Failed to create subcategory");
       setSubCategoryForm({ name: "", description: "", parentCategory: "" });
@@ -148,7 +149,7 @@ const ManageCategory = () => {
             name: editingItem.name,
             description: editingItem.description,
           }),
-        }
+        },
       );
       if (!res.ok) throw new Error("Update failed");
       setSuccess("Updated successfully");
@@ -175,7 +176,7 @@ const ManageCategory = () => {
           : `/categories/sub/delete/${id}`;
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}${endpoint}`,
-        { method: "DELETE", credentials: "include" }
+        { method: "DELETE", credentials: "include" },
       );
       if (!res.ok) throw new Error("Delete failed");
       setSuccess("Deleted successfully");
@@ -384,6 +385,7 @@ const ManageCategory = () => {
           </div>
         )}
       </div>
+      <Footer />
     </>
   );
 };

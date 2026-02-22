@@ -1,0 +1,25 @@
+/* FOOTER */
+.lp-footer {
+  border-top: 1px solid #eee;
+  padding: 18px 0;
+  background: #fff;
+  margin-top: 14px;
+}
+
+.lp-footer-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lp-brand {
+  font-weight: 1000;
+}
+
+.lp-footnote {
+  color: #666;
+  font-weight: 900;
+  font-size: 13px;
+}

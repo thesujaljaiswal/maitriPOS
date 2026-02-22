@@ -4,6 +4,7 @@ import "./style.css";
 import NavbarLayout from "../navbar/Navbar";
 import { Oval } from "react-loader-spinner";
 import fallbackImg from "../../assets/maitriPOS ICON 2.jpg";
+import Footer from "../footer/Footer";
 
 const ManageItems = () => {
   const navigate = useNavigate();
@@ -542,6 +543,7 @@ const ManageItems = () => {
           </div>
         )}
       </div>
+      <Footer />
     </>
   );
 };

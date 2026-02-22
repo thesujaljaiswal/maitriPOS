@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import CreateOrderModal from "./CreateOrderModal";
 import "./style.css";
 import NavbarLayout from "../navbar/Navbar";
+import Footer from "../footer/Footer";
 
 const INR = (n = 0) =>
   new Intl.NumberFormat("en-IN", {
@@ -388,6 +389,7 @@ export default function OrdersPage() {
           onCreated={refresh}
         />
       </div>
+      <Footer />
     </>
   );
 }

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "./style.css";
 import NavbarLayout from "../navbar/Navbar";
 import { Oval } from "react-loader-spinner";
+import Footer from "../footer/Footer";
 
 export default function ManageStore() {
   const navigate = useNavigate();
@@ -203,7 +204,10 @@ export default function ManageStore() {
             </div>
 
             <div className="ms-input-group">
-              <label>Store Slug (Please use text and number and avoid using special characters)</label>
+              <label>
+                Store Slug (Please use text and number and avoid using special
+                characters)
+              </label>
               <div className="ms-slug-row">
                 <input
                   value={formData.slug}
@@ -285,6 +289,7 @@ export default function ManageStore() {
           </form>
         </div>
       </div>
+      <Footer />
     </>
   );
 }

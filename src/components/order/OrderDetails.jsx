@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import "./style.css";
 import NavbarLayout from "../navbar/Navbar";
+import Footer from "../footer/Footer";
 
 const INR = (n = 0) =>
   new Intl.NumberFormat("en-IN", {
@@ -252,6 +253,7 @@ export default function OrderDetails() {
           </div>
         </div>
       </div>
+      <Footer />
     </>
   );
 }

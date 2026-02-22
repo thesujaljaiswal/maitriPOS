@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./style.css";
 import NavbarLayout from "../navbar/Navbar";
+import Footer from "../footer/Footer";
 
 export default function Account() {
   const navigate = useNavigate();
@@ -345,6 +346,7 @@ export default function Account() {
           </div>
         </div>
       )}
+      <Footer />
     </>
   );
 }

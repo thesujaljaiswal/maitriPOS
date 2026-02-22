@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import NavbarLayout from "../navbar/Navbar";
 import "./style.css";
+import Footer from "../footer/Footer";
 
 const INR = (n = 0) =>
   new Intl.NumberFormat("en-IN", {
@@ -162,115 +163,118 @@ export default function ExpenseTracker() {
   };
 
   return (
-    <div className="ex-page">
-      <NavbarLayout />
-      <div className="ex-wrap">
-        <div className="ex-header">
-          <div>
-            <h1 className="ex-h1">Expense Tracker</h1>
-            <p className="ex-sub">
-              {store?.name ? `${store.name} • ` : ""}Today
-            </p>
+    <>
+      <div className="ex-page">
+        <NavbarLayout />
+        <div className="ex-wrap">
+          <div className="ex-header">
+            <div>
+              <h1 className="ex-h1">Expense Tracker</h1>
+              <p className="ex-sub">
+                {store?.name ? `${store.name} • ` : ""}Today
+              </p>
+            </div>
+            <button className="ex-btn" onClick={load} disabled={loading}>
+              Refresh
+            </button>
           </div>
-          <button className="ex-btn" onClick={load} disabled={loading}>
-            Refresh
-          </button>
-        </div>
 
-        {loading ? (
-          <div className="ex-muted">Loading...</div>
-        ) : (
-          <>
-            <div className="ex-grid-main">
-              <div className="ex-section">
-                <h3 className="ex-section__title">Add Expense</h3>
-                <form className="ex-form" onSubmit={addExpense}>
-                  <div className="ex-field">
-                    <label className="ex-label">Amount</label>
-                    <input
-                      className="ex-input"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0"
-                      inputMode="numeric"
-                    />
-                  </div>
-                  <div className="ex-field">
-                    <label className="ex-label">Reason</label>
-                    <input
-                      className="ex-input"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Milk purchase"
-                    />
-                  </div>
-                  <button
-                    className="ex-btn ex-btn--full"
-                    type="submit"
-                    disabled={busy}
-                  >
-                    {busy ? "Saving..." : "Add"}
-                  </button>
-                </form>
-              </div>
-
-              <div className="ex-section">
-                <div className="ex-section__head">
-                  <h3 className="ex-section__title">Today’s List</h3>
-                  <span className="ex-total">{INR(totalExpense)}</span>
+          {loading ? (
+            <div className="ex-muted">Loading...</div>
+          ) : (
+            <>
+              <div className="ex-grid-main">
+                <div className="ex-section">
+                  <h3 className="ex-section__title">Add Expense</h3>
+                  <form className="ex-form" onSubmit={addExpense}>
+                    <div className="ex-field">
+                      <label className="ex-label">Amount</label>
+                      <input
+                        className="ex-input"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="0"
+                        inputMode="numeric"
+                      />
+                    </div>
+                    <div className="ex-field">
+                      <label className="ex-label">Reason</label>
+                      <input
+                        className="ex-input"
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="Milk purchase"
+                      />
+                    </div>
+                    <button
+                      className="ex-btn ex-btn--full"
+                      type="submit"
+                      disabled={busy}
+                    >
+                      {busy ? "Saving..." : "Add"}
+                    </button>
+                  </form>
                 </div>
-                {expenses.length ? (
-                  <div className="ex-list">
-                    {expenses.map((e) => (
-                      <div className="ex-row" key={e._id}>
-                        <div className="ex-row__left">
-                          <div className="ex-row__amt">{INR(e.amount)}</div>
-                          <div className="ex-row__reason">{e.reason}</div>
-                          <div className="ex-row__meta">
-                            {e.createdAt
-                              ? new Date(e.createdAt).toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })
-                              : "-"}
-                          </div>
-                        </div>
-                        <button
-                          className="ex-del"
-                          onClick={() => deleteExpense(e._id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="ex-muted">No expenses today.</div>
-                )}
-              </div>
-            </div>
 
-            {err && <div className="ex-error">{err}</div>}
-            <div className="ex-grid-cards">
-              <Card
-                title="Today Revenue"
-                value={INR(todayRevenue)}
-                sub={`Paid ${INR(paid)} • Pending ${INR(pending)}`}
-              />
-              <Card
-                title="Today Expenses"
-                value={INR(totalExpense)}
-                sub="Manual entries"
-              />
-              <Card
-                title="Net (Today)"
-                value={INR(net)}
-                sub={net >= 0 ? "Profit" : "Loss"}
-              />
-            </div>
-          </>
-        )}
+                <div className="ex-section">
+                  <div className="ex-section__head">
+                    <h3 className="ex-section__title">Today’s List</h3>
+                    <span className="ex-total">{INR(totalExpense)}</span>
+                  </div>
+                  {expenses.length ? (
+                    <div className="ex-list">
+                      {expenses.map((e) => (
+                        <div className="ex-row" key={e._id}>
+                          <div className="ex-row__left">
+                            <div className="ex-row__amt">{INR(e.amount)}</div>
+                            <div className="ex-row__reason">{e.reason}</div>
+                            <div className="ex-row__meta">
+                              {e.createdAt
+                                ? new Date(e.createdAt).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "-"}
+                            </div>
+                          </div>
+                          <button
+                            className="ex-del"
+                            onClick={() => deleteExpense(e._id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="ex-muted">No expenses today.</div>
+                  )}
+                </div>
+              </div>
+
+              {err && <div className="ex-error">{err}</div>}
+              <div className="ex-grid-cards">
+                <Card
+                  title="Today Revenue"
+                  value={INR(todayRevenue)}
+                  sub={`Paid ${INR(paid)} • Pending ${INR(pending)}`}
+                />
+                <Card
+                  title="Today Expenses"
+                  value={INR(totalExpense)}
+                  sub="Manual entries"
+                />
+                <Card
+                  title="Net (Today)"
+                  value={INR(net)}
+                  sub={net >= 0 ? "Profit" : "Loss"}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+      <Footer />
+    </>
   );
 }

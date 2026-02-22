@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Oval } from "react-loader-spinner";
 import NavbarLayout from "../navbar/Navbar.jsx";
 import "./style.css";
+import Footer from "../footer/Footer.jsx";
 
 const PLANS = [
   {
@@ -428,14 +429,7 @@ export default function Landing() {
         </section>
 
         {/* FOOTER */}
-        <footer className="lp-footer">
-          <div className="lp-wrap lp-footer-inner">
-            <div className="lp-brand">maitriPOS™</div>
-            <div className="lp-footnote">
-              Support: <b>sujaljaiswal548@gmail.com</b>
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </>
   );

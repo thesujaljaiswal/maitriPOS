@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavbarLayout from "../navbar/Navbar";
+import Footer from "../footer/Footer";
 
 export default function Upgrade() {
   const navigate = useNavigate();
@@ -245,6 +246,7 @@ export default function Upgrade() {
           </button>
         </div>
       </div>
+      <Footer />
     </>
   );
 }
