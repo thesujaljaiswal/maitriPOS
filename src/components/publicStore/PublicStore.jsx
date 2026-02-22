@@ -24,7 +24,7 @@ const PublicStore = ({ slug }) => {
   const [openSubCats, setOpenSubCats] = useState({});
   const categoryRefs = useRef({});
 
-  // --- Languages list (English always present + first) ---
+  // --- Languages (English always present + first) ---
   const langsFinal = useMemo(() => {
     const list = Array.isArray(LANGS) ? [...LANGS] : [];
     if (!list.some((l) => l?.code === "en"))
@@ -50,11 +50,18 @@ const PublicStore = ({ slug }) => {
     [langsFinal],
   );
 
-  // --- Cookie helpers (clear/set across domain variations) ---
+  // IMPORTANT: exclude "en" from includedLanguages (prevents weird defaults)
+  const includedLanguages = useMemo(() => {
+    return langsFinal
+      .map((l) => l.code)
+      .filter((c) => c && c !== "en")
+      .join(",");
+  }, [langsFinal]);
+
+  // --- Cookie helpers (set/clear across domain variants) ---
   const getCookieDomains = useCallback(() => {
     const host = window.location.hostname;
     const parts = host.split(".").filter(Boolean);
-
     if (host === "localhost" || parts.length < 2) return [null];
 
     const root = `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
@@ -71,6 +78,7 @@ const PublicStore = ({ slug }) => {
       const maxAge = days * 24 * 60 * 60;
       const base = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; samesite=lax`;
       const domains = getCookieDomains();
+
       domains.forEach((d) => {
         if (d) document.cookie = `${base}; domain=${d}`;
         else document.cookie = base;
@@ -87,38 +95,28 @@ const PublicStore = ({ slug }) => {
         if (d) document.cookie = `${name}=; ${expire}; domain=${d}`;
         else document.cookie = `${name}=; ${expire}`;
       });
-
-      // extra safety: some browsers store a path-less variant
       document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
     },
     [getCookieDomains],
   );
 
-  // --- Hard reset (THIS is what removes “sticky Afrikaans”) ---
+  // --- FULL RESET (used when switching back to English) ---
   const hardResetToEnglish = useCallback(() => {
     try {
-      // 1) kill googtrans everywhere, then force /en/en
       clearCookieEverywhere(GT_COOKIE);
       setCookieEverywhere(GT_COOKIE, "/en/en");
 
-      // 2) remove translated state from DOM
       document.documentElement.classList.remove("translated-ltr");
       document.documentElement.classList.remove("translated-rtl");
 
-      // banner iframe + any leftovers
       const banner = document.querySelector(".goog-te-banner-frame");
       if (banner) banner.remove();
 
-      // reset body offset caused by banner
       if (document.body) document.body.style.top = "0px";
-
-      // Google also injects this sometimes
-      const skip = document.getElementById(":1.container");
-      if (skip) skip.remove();
     } catch (e) {}
   }, [clearCookieEverywhere, setCookieEverywhere]);
 
-  // --- Apply lang to Google Translate widget (when combo exists) ---
+  // --- Apply lang to GT widget when combo exists ---
   const applyGoogleLang = useCallback((code, tries = 0) => {
     try {
       const combo = document.querySelector(".goog-te-combo");
@@ -134,94 +132,117 @@ const PublicStore = ({ slug }) => {
     } catch (e) {}
   }, []);
 
-  const [gtReady, setGtReady] = useState(false);
+  // ✅ Source of truth (stable): mt_lang only
   const [lang, setLang] = useState("en");
+  const [gtReady, setGtReady] = useState(false);
 
-  // ✅ Source of truth: mt_lang ONLY (never trust googtrans)
+  // --- Lazy loader: only loads GT when needed ---
+  const ensureGoogleTranslateLoaded = useCallback(() => {
+    return new Promise((resolve) => {
+      // If already initialized, resolve immediately
+      if (
+        window.google?.translate?.TranslateElement &&
+        window.__GT_INITIALIZED__
+      ) {
+        setGtReady(true);
+        resolve(true);
+        return;
+      }
+
+      // define init callback once
+      window.googleTranslateElementInit = () => {
+        try {
+          if (window.__GT_INITIALIZED__) {
+            setGtReady(true);
+            resolve(true);
+            return;
+          }
+          window.__GT_INITIALIZED__ = true;
+
+          new window.google.translate.TranslateElement(
+            {
+              pageLanguage: "en",
+              autoDisplay: false,
+              includedLanguages, // <-- excludes "en"
+            },
+            GT_ELEM_ID,
+          );
+
+          setGtReady(true);
+          resolve(true);
+        } catch (e) {
+          resolve(false);
+        }
+      };
+
+      // inject script once
+      if (!document.getElementById(GT_SCRIPT_ID)) {
+        const script = document.createElement("script");
+        script.id = GT_SCRIPT_ID;
+        script.src =
+          "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+        script.async = true;
+        document.body.appendChild(script);
+      } else {
+        // script exists, wait for window.google
+        const t = setInterval(() => {
+          if (window.google?.translate?.TranslateElement) {
+            clearInterval(t);
+            window.googleTranslateElementInit();
+          }
+        }, 200);
+        setTimeout(() => {
+          clearInterval(t);
+          resolve(false);
+        }, 8000);
+      }
+    });
+  }, [includedLanguages]);
+
+  // Read saved language on mount
   useEffect(() => {
     const saved = readCookie(LANG_COOKIE);
     const next = saved && allowedLangCodes.has(saved) ? saved : "en";
-
-    // If no saved lang OR invalid -> force clean English (prevents Afrikaans start)
-    if (next === "en") hardResetToEnglish();
-
     setLang(next);
+
+    // If english, force clean english and DO NOT load google translate
+    if (next === "en") {
+      hardResetToEnglish();
+    } else {
+      // if non-english saved, load and apply
+      ensureGoogleTranslateLoaded().then(() => {
+        setCookieEverywhere(GT_COOKIE, `/en/${next}`);
+        applyGoogleLang(next);
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowedLangCodes]);
 
-  useEffect(() => {
-    try {
-      document.documentElement.lang = "en";
-    } catch (e) {}
-  }, []);
-
-  // --- Load + init Google Translate once ---
-  useEffect(() => {
-    const init = () => {
-      try {
-        if (!window.google?.translate?.TranslateElement) return;
-
-        if (window.__GT_INITIALIZED__) {
-          setGtReady(true);
-          return;
-        }
-        window.__GT_INITIALIZED__ = true;
-
-        new window.google.translate.TranslateElement(
-          {
-            pageLanguage: "en",
-            autoDisplay: false,
-            includedLanguages: Array.from(allowedLangCodes).join(","),
-          },
-          GT_ELEM_ID,
-        );
-
-        setGtReady(true);
-      } catch (e) {}
-    };
-
-    window.googleTranslateElementInit = init;
-
-    if (window.google?.translate?.TranslateElement) {
-      init();
-      return;
-    }
-
-    if (!document.getElementById(GT_SCRIPT_ID)) {
-      const script = document.createElement("script");
-      script.id = GT_SCRIPT_ID;
-      script.src =
-        "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-      script.async = true;
-      document.body.appendChild(script);
-    } else {
-      const t = setInterval(() => {
-        if (window.google?.translate?.TranslateElement) {
-          clearInterval(t);
-          init();
-        }
-      }, 200);
-      return () => clearInterval(t);
-    }
-  }, [allowedLangCodes]);
-
-  // ✅ On lang change: persist mt_lang, set googtrans properly, and *fully revert* for English
+  // Persist + apply on user change
   useEffect(() => {
     setCookieEverywhere(LANG_COOKIE, lang);
 
     if (lang === "en") {
-      // This is the critical part:
       hardResetToEnglish();
-      // after reset, still try to set combo to en
-      applyGoogleLang("en");
+
+      // If page was already translated, safest is reload to fully restore DOM
+      const wasTranslated =
+        document.documentElement.classList.contains("translated-ltr") ||
+        document.documentElement.classList.contains("translated-rtl");
+      if (wasTranslated) {
+        window.location.reload();
+      }
       return;
     }
 
-    // non-English -> set googtrans + apply
-    setCookieEverywhere(GT_COOKIE, `/en/${lang}`);
-    applyGoogleLang(lang);
+    // only NOW load GT (prevents auto-setting /en/af on first load)
+    ensureGoogleTranslateLoaded().then(() => {
+      setCookieEverywhere(GT_COOKIE, `/en/${lang}`);
+      applyGoogleLang(lang);
+    });
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang, gtReady]);
+  }, [lang]);
 
   // ✅ favicon as store logo
   const setFavicon = useCallback((href) => {
@@ -302,6 +323,7 @@ const PublicStore = ({ slug }) => {
 
   return (
     <div className="ps-wrapper">
+      {/* GT mount point (hidden) */}
       <div id={GT_ELEM_ID} style={{ display: "none" }} />
 
       <header className="ps-hero">
