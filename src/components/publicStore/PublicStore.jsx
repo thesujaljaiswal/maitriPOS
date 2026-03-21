@@ -9,7 +9,7 @@ import React, {
 import logoFallback from "../../assets/maitriPOS ICON 2.jpg";
 import "./style.css";
 import { Oval } from "react-loader-spinner";
-import { getTheme } from "./theme";
+import { getTheme } from "./Theme";
 
 const THEME = getTheme();
 
