@@ -6,538 +6,583 @@ import React, {
   memo,
   useMemo,
 } from "react";
-import logo from "../../assets/maitriPOS ICON 2.jpg";
+import logoFallback from "../../assets/maitriPOS ICON 2.jpg";
 import "./style.css";
 import { Oval } from "react-loader-spinner";
-import LANGS from "./language.json";
+import { getTheme } from "./theme";
 
-const GT_SCRIPT_ID = "google-translate-script";
-const GT_ELEM_ID = "google_translate_element";
-const LANG_COOKIE = "mt_lang";
-const GT_COOKIE = "googtrans";
+const THEME = getTheme();
 
+/* ────────────────────────────────────────────────────
+   Inject all CSS variables + body theme-class
+   Called once on mount — no flicker.
+──────────────────────────────────────────────────── */
+const applyTheme = () => {
+  const r = document.documentElement;
+  r.style.setProperty("--accent", THEME.accent);
+  r.style.setProperty("--accent-dark", THEME.accentDark);
+  r.style.setProperty("--page-bg", THEME.bg);
+  r.style.setProperty("--card-bg", THEME.cardBg);
+  r.style.setProperty("--card-border", THEME.cardBorder);
+  r.style.setProperty("--tab-active-bg", THEME.tabActiveBg);
+  r.style.setProperty("--tab-active-tx", THEME.tabActiveText);
+  r.style.setProperty("--text-primary", THEME.textPrimary);
+  r.style.setProperty("--text-secondary", THEME.textSecondary);
+  r.style.setProperty("--header-bg", THEME.headerBg);
+  r.style.setProperty("--search-bg", THEME.searchBg);
+
+  // apply theme-class so CSS can do light/dark-specific rules
+  document.body.classList.remove("theme-light", "theme-dark");
+  if (THEME.themeClass) {
+    document.body.classList.add(THEME.themeClass);
+  }
+};
+
+/* ────────────────────────────────────────────────────
+   Floating particle layer — emoji drifts down the page
+──────────────────────────────────────────────────── */
+const ParticleLayer = () => {
+  const emoji = THEME.particles;
+  const count = Math.min(THEME.particleCount || 0, 20);
+  if (!emoji || count === 0) return null;
+
+  // generate once — stable between renders
+  const particles = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => ({
+        id: i,
+        left: `${4 + Math.random() * 92}%`,
+        size: `${14 + Math.random() * 14}px`,
+        dur: `${7 + Math.random() * 9}s`,
+        delay: `${Math.random() * 14}s`,
+      })),
+    [],
+  ); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="particle-layer" aria-hidden="true">
+      {particles.map((p) => (
+        <span
+          key={p.id}
+          className="particle"
+          style={{
+            left: p.left,
+            fontSize: p.size,
+            "--fall-dur": p.dur,
+            "--fall-delay": p.delay,
+          }}
+        >
+          {emoji}
+        </span>
+      ))}
+    </div>
+  );
+};
+
+/* ────────────────────────────────────────────────────
+   Helpers
+──────────────────────────────────────────────────── */
+const minPrice = (item) =>
+  item.price ||
+  (item.variants?.length ? Math.min(...item.variants.map((v) => v.price)) : 0);
+
+const VegDot = () => (
+  <span className="dot-veg" title="Vegetarian">
+    <span className="dot-veg__circle" />
+  </span>
+);
+
+/* ────────────────────────────────────────────────────
+   Festival Banner
+──────────────────────────────────────────────────── */
+const FestivalBanner = () => {
+  const b = THEME.banner;
+  if (!b?.show) return null;
+  return (
+    <div className="fest-banner" style={{ background: b.bg }}>
+      <span className="fest-banner__emoji">{b.emoji}</span>
+      <div className="fest-banner__text">
+        <strong style={{ color: b.textColor }}>{b.line1}</strong>
+        <span style={{ color: b.subtextColor }}>{b.line2}</span>
+      </div>
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════
+   PRODUCT CARD
+════════════════════════════════════════════════════ */
+const ProductCard = memo(({ item, onOpen, index = 0 }) => {
+  const isOOS = !item.isAvailable;
+  const price = minPrice(item);
+  const hasV = item.variants?.length > 0;
+
+  return (
+    <article
+      className={`card card--enter${isOOS ? " card--oos" : ""}`}
+      style={{ animationDelay: `${index * 0.055}s` }}
+      onClick={() => !isOOS && onOpen(item)}
+      role={!isOOS ? "button" : undefined}
+      tabIndex={!isOOS ? 0 : undefined}
+      onKeyDown={(e) => e.key === "Enter" && !isOOS && onOpen(item)}
+    >
+      {/* thumbnail */}
+      <div className="card__thumb">
+        <img
+          src={item.image || logoFallback}
+          alt={item.name}
+          loading="lazy"
+          onError={(e) => {
+            e.target.src = logoFallback;
+          }}
+        />
+        {isOOS && <div className="card__oos-film">Sold Out</div>}
+        {item.tags?.[0] && !isOOS && (
+          <span className="card__tag">#{item.tags[0].replace(/\s+/g, "")}</span>
+        )}
+      </div>
+
+      {/* body */}
+      <div className="card__body">
+        <div className="card__dot-row">
+          <VegDot />
+        </div>
+        <h4 className="card__name">{item.name}</h4>
+        <div className="card__foot">
+          <span className="card__price">
+            ₹{price}
+            {hasV && <small>+</small>}
+          </span>
+          {!isOOS ? (
+            <button
+              className="card__btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen(item);
+              }}
+            >
+              View
+            </button>
+          ) : (
+            <span className="card__sold">Unavailable</span>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+});
+
+/* ════════════════════════════════════════════════════
+   ITEM DETAIL SHEET
+════════════════════════════════════════════════════ */
+const ItemSheet = ({ item, onClose }) => {
+  const [sel, setSel] = useState(item.variants?.[0] || null);
+  const price = sel?.price ?? item.price ?? null;
+
+  /* lock body scroll */
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  return (
+    <div
+      className="sheet-mask"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={item.name}
+    >
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        {/* drag handle (mobile only) */}
+        <div className="sheet__handle" />
+
+        {/* hero image */}
+        <div className="sheet__hero">
+          <img
+            src={item.image || logoFallback}
+            alt={item.name}
+            onError={(e) => {
+              e.target.src = logoFallback;
+            }}
+          />
+          <button className="sheet__x" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+          {!item.isAvailable && (
+            <div className="sheet__oos-film">Currently Unavailable</div>
+          )}
+        </div>
+
+        {/* content */}
+        <div className="sheet__body">
+          {/* title + price */}
+          <div className="sheet__title-row">
+            <div className="sheet__title-left">
+              <VegDot />
+              <h2 className="sheet__title">{item.name}</h2>
+            </div>
+            {price != null && <span className="sheet__price">₹{price}</span>}
+          </div>
+
+          <p className="sheet__desc">{item.description}</p>
+
+          {/* tags */}
+          {item.tags?.length > 0 && (
+            <div className="sheet__tags">
+              {item.tags.map((t, i) => (
+                <span key={i} className="sheet__tag-pill">
+                  #{t.replace(/\s+/g, "")}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* variants table */}
+          {item.variants?.length > 0 && (
+            <div className="sheet__variants">
+              <p className="sheet__variants-label">Available sizes & prices</p>
+              <table className="variant-table">
+                <thead>
+                  <tr>
+                    <th>Size / Quantity</th>
+                    <th>Price</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {item.variants.map((v) => (
+                    <tr
+                      key={v._id}
+                      className={
+                        sel?._id === v._id ? "variant-table__row--active" : ""
+                      }
+                      onClick={() => setSel(v)}
+                    >
+                      <td className="variant-table__size">{v.name}</td>
+                      <td className="variant-table__price">₹{v.price}</td>
+                      <td className="variant-table__check">
+                        {sel?._id === v._id && (
+                          <span className="check-mark" key={v._id}>
+                            ✓
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* CTA */}
+          <button
+            className="sheet__cta"
+            onClick={onClose}
+            disabled={!item.isAvailable}
+          >
+            {item.isAvailable
+              ? `Got it${price != null ? ` — ₹${price}` : ""}`
+              : "Currently Unavailable"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════
+   MAIN PAGE
+════════════════════════════════════════════════════ */
 const PublicStore = ({ slug }) => {
   const [storeData, setStoreData] = useState(null);
   const [error, setError] = useState("");
-  const [activeCategory, setActiveCategory] = useState(null);
+  const [activeTab, setActiveTab] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [openSubCats, setOpenSubCats] = useState({});
+  const [searchQuery, setSearchQuery] = useState("");
   const categoryRefs = useRef({});
 
-  // --- Languages (English always present + first) ---
-  const langsFinal = useMemo(() => {
-    const list = Array.isArray(LANGS) ? [...LANGS] : [];
-    if (!list.some((l) => l?.code === "en"))
-      list.push({ code: "en", label: "English" });
+  /* apply theme + viewport meta on first mount */
+  useEffect(() => {
+    applyTheme();
 
-    const en = list.find((l) => l?.code === "en") || {
-      code: "en",
-      label: "English",
+    let vp = document.querySelector("meta[name='viewport']");
+    if (!vp) {
+      vp = document.createElement("meta");
+      vp.name = "viewport";
+      document.head.appendChild(vp);
+    }
+    vp.content = "width=device-width, initial-scale=1, viewport-fit=cover";
+
+    return () => {
+      document.body.classList.remove("theme-light", "theme-dark");
     };
-    const rest = list
-      .filter((l) => l?.code && l.code !== "en")
-      .sort((a, b) =>
-        (a.label || "").localeCompare(b.label || "", "en", {
-          sensitivity: "base",
-        }),
-      );
-
-    return [en, ...rest];
   }, []);
 
-  const allowedLangCodes = useMemo(
-    () => new Set(langsFinal.map((l) => l.code).filter(Boolean)),
-    [langsFinal],
-  );
-
-  // IMPORTANT: exclude "en" from includedLanguages (prevents weird defaults)
-  const includedLanguages = useMemo(() => {
-    return langsFinal
-      .map((l) => l.code)
-      .filter((c) => c && c !== "en")
-      .join(",");
-  }, [langsFinal]);
-
-  // --- Cookie helpers (set/clear across domain variants) ---
-  const getCookieDomains = useCallback(() => {
-    const host = window.location.hostname;
-    const parts = host.split(".").filter(Boolean);
-    if (host === "localhost" || parts.length < 2) return [null];
-
-    const root = `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
-    return [host, `.${root}`, root, null];
-  }, []);
-
-  const readCookie = useCallback((name) => {
-    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-    return match ? decodeURIComponent(match[1]) : "";
-  }, []);
-
-  const setCookieEverywhere = useCallback(
-    (name, value, days = 365) => {
-      const maxAge = days * 24 * 60 * 60;
-      const base = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; samesite=lax`;
-      const domains = getCookieDomains();
-
-      domains.forEach((d) => {
-        if (d) document.cookie = `${base}; domain=${d}`;
-        else document.cookie = base;
-      });
-    },
-    [getCookieDomains],
-  );
-
-  const clearCookieEverywhere = useCallback(
-    (name) => {
-      const domains = getCookieDomains();
-      const expire = `expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; samesite=lax`;
-      domains.forEach((d) => {
-        if (d) document.cookie = `${name}=; ${expire}; domain=${d}`;
-        else document.cookie = `${name}=; ${expire}`;
-      });
-      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-    },
-    [getCookieDomains],
-  );
-
-  // --- FULL RESET (used when switching back to English) ---
-  const hardResetToEnglish = useCallback(() => {
-    try {
-      clearCookieEverywhere(GT_COOKIE);
-      setCookieEverywhere(GT_COOKIE, "/en/en");
-
-      document.documentElement.classList.remove("translated-ltr");
-      document.documentElement.classList.remove("translated-rtl");
-
-      const banner = document.querySelector(".goog-te-banner-frame");
-      if (banner) banner.remove();
-
-      if (document.body) document.body.style.top = "0px";
-    } catch (e) {}
-  }, [clearCookieEverywhere, setCookieEverywhere]);
-
-  // --- Apply lang to GT widget when combo exists ---
-  const applyGoogleLang = useCallback((code, tries = 0) => {
-    try {
-      const combo = document.querySelector(".goog-te-combo");
-      if (!combo) {
-        if (tries < 80) setTimeout(() => applyGoogleLang(code, tries + 1), 150);
-        return;
-      }
-      if (combo.value !== code) {
-        combo.value = code;
-        combo.dispatchEvent(new Event("change"));
-        combo.dispatchEvent(new Event("blur"));
-      }
-    } catch (e) {}
-  }, []);
-
-  // ✅ Source of truth (stable): mt_lang only
-  const [lang, setLang] = useState("en");
-  const [gtReady, setGtReady] = useState(false);
-
-  // --- Lazy loader: only loads GT when needed ---
-  const ensureGoogleTranslateLoaded = useCallback(() => {
-    return new Promise((resolve) => {
-      // If already initialized, resolve immediately
-      if (
-        window.google?.translate?.TranslateElement &&
-        window.__GT_INITIALIZED__
-      ) {
-        setGtReady(true);
-        resolve(true);
-        return;
-      }
-
-      // define init callback once
-      window.googleTranslateElementInit = () => {
-        try {
-          if (window.__GT_INITIALIZED__) {
-            setGtReady(true);
-            resolve(true);
-            return;
-          }
-          window.__GT_INITIALIZED__ = true;
-
-          new window.google.translate.TranslateElement(
-            {
-              pageLanguage: "en",
-              autoDisplay: false,
-              includedLanguages, // <-- excludes "en"
-            },
-            GT_ELEM_ID,
-          );
-
-          setGtReady(true);
-          resolve(true);
-        } catch (e) {
-          resolve(false);
-        }
-      };
-
-      // inject script once
-      if (!document.getElementById(GT_SCRIPT_ID)) {
-        const script = document.createElement("script");
-        script.id = GT_SCRIPT_ID;
-        script.src =
-          "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-        script.async = true;
-        document.body.appendChild(script);
-      } else {
-        // script exists, wait for window.google
-        const t = setInterval(() => {
-          if (window.google?.translate?.TranslateElement) {
-            clearInterval(t);
-            window.googleTranslateElementInit();
-          }
-        }, 200);
-        setTimeout(() => {
-          clearInterval(t);
-          resolve(false);
-        }, 8000);
-      }
-    });
-  }, [includedLanguages]);
-
-  // Read saved language on mount
+  /* Escape key closes sheet */
   useEffect(() => {
-    const saved = readCookie(LANG_COOKIE);
-    const next = saved && allowedLangCodes.has(saved) ? saved : "en";
-    setLang(next);
-
-    // If english, force clean english and DO NOT load google translate
-    if (next === "en") {
-      hardResetToEnglish();
-    } else {
-      // if non-english saved, load and apply
-      ensureGoogleTranslateLoaded().then(() => {
-        setCookieEverywhere(GT_COOKIE, `/en/${next}`);
-        applyGoogleLang(next);
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allowedLangCodes]);
-
-  // Persist + apply on user change
-  useEffect(() => {
-    setCookieEverywhere(LANG_COOKIE, lang);
-
-    if (lang === "en") {
-      hardResetToEnglish();
-
-      // If page was already translated, safest is reload to fully restore DOM
-      const wasTranslated =
-        document.documentElement.classList.contains("translated-ltr") ||
-        document.documentElement.classList.contains("translated-rtl");
-      if (wasTranslated) {
-        window.location.reload();
-      }
-      return;
-    }
-
-    // only NOW load GT (prevents auto-setting /en/af on first load)
-    ensureGoogleTranslateLoaded().then(() => {
-      setCookieEverywhere(GT_COOKIE, `/en/${lang}`);
-      applyGoogleLang(lang);
-    });
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang]);
-
-  // ✅ favicon as store logo
-  const setFavicon = useCallback((href) => {
-    try {
-      if (!href) return;
-
-      let link =
-        document.querySelector("link[rel='icon']") ||
-        document.querySelector("link[rel='shortcut icon']");
-
-      if (!link) {
-        link = document.createElement("link");
-        link.rel = "icon";
-        document.head.appendChild(link);
-      }
-
-      link.type = "image/png";
-      link.href = href;
-    } catch (e) {}
+    const h = (e) => e.key === "Escape" && setSelectedItem(null);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
   }, []);
 
+  /* scroll spy — update active tab */
+  useEffect(() => {
+    const onScroll = () => {
+      const offset = window.innerWidth >= 768 ? 170 : 150;
+      const y = window.scrollY + offset;
+      let cur = null;
+      Object.entries(categoryRefs.current).forEach(([id, el]) => {
+        if (el && el.offsetTop <= y) cur = id;
+      });
+      if (cur) setActiveTab(cur);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [storeData]);
+
+  /* fetch */
   const fetchStore = useCallback(async () => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`,
       );
-      if (!res.ok) throw new Error("Store not found");
-
-      const data = await res.json();
-      const sd = data.data;
-
-      setStoreData(sd);
-
-      if (sd.categories?.length > 0) setActiveCategory(sd.categories[0]._id);
-
-      const initialSubCats = {};
-      sd.categories?.forEach((cat) => {
-        cat.subCategories?.forEach((sub) => {
-          initialSubCats[sub._id] = true;
-        });
-      });
-      setOpenSubCats(initialSubCats);
-
-      document.title = sd?.store?.name || "Store";
-      setFavicon(sd?.store?.logo || logo);
-    } catch (err) {
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      setStoreData(json.data);
+      if (json.data.categories?.length > 0)
+        setActiveTab(json.data.categories[0]._id);
+    } catch {
       setError("Store not found");
     }
-  }, [slug, setFavicon]);
+  }, [slug]);
 
   useEffect(() => {
     fetchStore();
   }, [fetchStore]);
 
-  const onChangeLang = (e) => {
-    const code = e.target.value;
-    if (!allowedLangCodes.has(code)) return;
-    setLang(code);
-  };
+  /* browser tab title + favicon */
+  useEffect(() => {
+    if (!storeData) return;
+    const { store } = storeData;
 
-  if (error) {
+    document.title = store.name ? `${store.name} — Menu` : "Menu";
+
+    if (store.logo) {
+      document
+        .querySelectorAll("link[rel~='icon'], link[rel='apple-touch-icon']")
+        .forEach((el) => el.remove());
+
+      const fav = document.createElement("link");
+      fav.rel = "icon";
+      fav.type = "image/png";
+      fav.href = store.logo;
+      document.head.appendChild(fav);
+
+      const apple = document.createElement("link");
+      apple.rel = "apple-touch-icon";
+      apple.href = store.logo;
+      document.head.appendChild(apple);
+    }
+
+    return () => {
+      document.title = "MaitriPOS";
+    };
+  }, [storeData]);
+
+  /* filtered categories for search */
+  const filtered = useMemo(() => {
+    if (!storeData) return [];
+    if (!searchQuery) return storeData.categories;
+    const q = searchQuery.toLowerCase();
+    return storeData.categories
+      .map((cat) => ({
+        ...cat,
+        subCategories: cat.subCategories
+          .map((sub) => ({
+            ...sub,
+            items: sub.items.filter(
+              (i) =>
+                i.name.toLowerCase().includes(q) ||
+                i.description?.toLowerCase().includes(q) ||
+                i.tags?.some((t) => t.toLowerCase().includes(q)),
+            ),
+          }))
+          .filter((sub) => sub.items.length > 0),
+      }))
+      .filter((cat) => cat.subCategories.length > 0);
+  }, [storeData, searchQuery]);
+
+  /* ── states ── */
+  if (error)
     return (
-      <div className="ps-status">
-        <h2>{error}</h2>
+      <div className="state-screen">
+        <span className="state-screen__icon">🔍</span>
+        <h2>Store not found</h2>
+        <p>The link may be wrong or the store is offline.</p>
       </div>
     );
-  }
 
-  if (!storeData) {
+  if (!storeData)
     return (
-      <div className="ps-status">
-        <Oval color="#000" />
+      <div className="state-screen">
+        <Oval
+          color={THEME.accent}
+          secondaryColor={THEME.cardBorder}
+          strokeWidth={3}
+          width={44}
+          height={44}
+        />
       </div>
     );
-  }
 
-  const { store, categories } = storeData;
+  const { store } = storeData;
 
   return (
-    <div className="ps-wrapper">
-      {/* GT mount point (hidden) */}
-      <div id={GT_ELEM_ID} style={{ display: "none" }} />
+    <div className="ps-page">
+      {/* floating particles */}
+      <ParticleLayer />
 
-      <header className="ps-hero">
-        <div className="ps-hero-inner">
-          <div className="ps-hero-top">
-            <div className="ps-lang-wrap notranslate" translate="no">
-              <span className="ps-lang-chip">🌐 Language</span>
-              <select
-                className="ps-lang-select"
-                value={lang}
-                onChange={onChangeLang}
-              >
-                {langsFinal.map((l) => (
-                  <option key={l.code} value={l.code}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
+      {/* festival banner */}
+      <FestivalBanner />
+
+      {/* header */}
+      <header className="ps-header">
+        <div className="ps-header__row">
+          <img
+            src={store.logo || logoFallback}
+            alt={store.name}
+            className="ps-header__logo"
+            onError={(e) => {
+              e.target.src = logoFallback;
+            }}
+          />
+          <div className="ps-header__meta">
+            <h1 className="ps-header__name">{store.name}</h1>
+            {store.address && (
+              <p className="ps-header__address">📍 {store.address}</p>
+            )}
+            <div className="ps-header__chips">
+              <a href={`tel:${store.contact.phone}`} className="chip">
+                📞 Call
+              </a>
+              <a href={`mailto:${store.contact.email}`} className="chip">
+                ✉️ Email
+              </a>
+              {store.isOnline && (
+                <span className="chip chip--live">● Open</span>
+              )}
             </div>
           </div>
+        </div>
 
-          <div className="ps-logo-wrap notranslate" translate="no">
-            <img src={store.logo || logo} alt="Logo" className="ps-logo" />
-            <span className={`ps-badge ${store.isOnline ? "ps-on" : "ps-off"}`}>
-              {store.isOnline ? "Accepting Orders" : "Closed"}
-            </span>
-          </div>
-
-          <h1 className="ps-title">{store.name}</h1>
-          <p className="ps-addr">{store.address}</p>
-
-          <div className="ps-links notranslate" translate="no">
-            <a href={`tel:${store?.contact?.phone || ""}`}>
-              📞 {store?.contact?.phone || "Call"}
-            </a>
-            <a href={`mailto:${store?.contact?.email || ""}`}>✉️ Email Us</a>
-          </div>
+        {/* search */}
+        <div className="ps-search">
+          <span className="ps-search__ico">🔍</span>
+          <input
+            type="search"
+            placeholder={
+              THEME.banner?.show
+                ? `Search ${store.name}...`
+                : "Search anything..."
+            }
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              className="ps-search__clr"
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear search"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </header>
 
-      <nav className="ps-nav notranslate" translate="no">
-        <div className="ps-nav-scroll">
-          {categories.map((c) => (
-            <button
-              key={c._id}
-              className={`ps-pill ${activeCategory === c._id ? "ps-pill-active" : ""}`}
-              onClick={() => {
-                setActiveCategory(c._id);
-                const el = categoryRefs.current[c._id];
-                if (el)
-                  window.scrollTo({
-                    top: el.offsetTop - 80,
-                    behavior: "smooth",
-                  });
-              }}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
+      {/* category tabs */}
+      <nav className="ps-tabs" role="navigation" aria-label="Categories">
+        {filtered.map((c) => (
+          <button
+            key={c._id}
+            className={`ps-tab${activeTab === c._id ? " ps-tab--on" : ""}`}
+            onClick={() => {
+              setActiveTab(c._id);
+              const el = categoryRefs.current[c._id];
+              if (el) {
+                const offset = window.innerWidth >= 768 ? 155 : 125;
+                window.scrollTo({
+                  top: el.offsetTop - offset,
+                  behavior: "smooth",
+                });
+              }
+            }}
+          >
+            {c.name}
+          </button>
+        ))}
       </nav>
 
-      <main className="ps-main">
-        {categories.map((cat) => (
-          <section
-            key={cat._id}
-            ref={(el) => (categoryRefs.current[cat._id] = el)}
-            className="ps-section"
-          >
-            <h2 className="ps-sec-title">{cat.name}</h2>
+      {/* menu */}
+      <main className="ps-menu">
+        {filtered.length === 0 ? (
+          <div className="state-empty">
+            <span>🔍</span>
+            <h3>Nothing found</h3>
+            <p>Try a different keyword</p>
+            <button onClick={() => setSearchQuery("")}>Clear search</button>
+          </div>
+        ) : (
+          filtered.map((cat) => (
+            <section
+              key={cat._id}
+              ref={(el) => (categoryRefs.current[cat._id] = el)}
+              className="ps-section"
+            >
+              <h2 className="ps-section__title">{cat.name}</h2>
 
-            {cat.subCategories?.map((sub) => (
-              <div
-                key={sub._id}
-                className={`ps-acc ${openSubCats[sub._id] ? "ps-open" : ""}`}
-              >
-                <div
-                  className="ps-acc-head"
-                  onClick={() =>
-                    setOpenSubCats((p) => ({ ...p, [sub._id]: !p[sub._id] }))
-                  }
-                >
-                  <div>
-                    <span className="ps-acc-name">{sub.name}</span>
-                    <span className="ps-acc-count">
-                      {sub.items?.length} items
-                    </span>
-                  </div>
-                  <span className="ps-chevron">↓</span>
-                </div>
-
-                <div className="ps-acc-content">
-                  <div className="ps-acc-inner">
-                    <div className="ps-grid">
-                      {sub.items?.map((item) => (
-                        <ProductCard
-                          key={item._id}
-                          item={item}
-                          onOpen={setSelectedItem}
-                          store={store}
-                        />
-                      ))}
-                    </div>
+              {cat.subCategories.map((sub) => (
+                <div key={sub._id} className="ps-sub">
+                  {sub.name !== cat.name && (
+                    <h3 className="ps-sub__title">{sub.name}</h3>
+                  )}
+                  <div className="ps-grid">
+                    {sub.items.map((item, idx) => (
+                      <ProductCard
+                        key={item._id}
+                        item={item}
+                        onOpen={setSelectedItem}
+                        index={idx}
+                      />
+                    ))}
                   </div>
                 </div>
-              </div>
-            ))}
-          </section>
-        ))}
+              ))}
+            </section>
+          ))
+        )}
       </main>
 
-      <footer className="ps-footer notranslate" translate="no">
-        <p className="ps-powered-by">
+      {/* footer */}
+      <footer className="ps-footer">
+        <p>
           Powered by{" "}
           <a href="https://maitripos.com" target="_blank" rel="noreferrer">
-            maitripos.com
+            MaitriPOS
           </a>
         </p>
       </footer>
 
+      {/* item detail sheet */}
       {selectedItem && (
-        <div className="ps-modal-overlay" onClick={() => setSelectedItem(null)}>
-          <div className="ps-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ps-modal-grid">
-              <div className="ps-modal-img">
-                <img
-                  src={selectedItem.image || store.logo || logo}
-                  alt={selectedItem.name}
-                />
-                <button
-                  className="ps-close-btn"
-                  onClick={() => setSelectedItem(null)}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <div className="ps-modal-info">
-                <div className="ps-modal-header">
-                  <h3>{selectedItem.name}</h3>
-                  <span className="ps-modal-price notranslate" translate="no">
-                    ₹
-                    {selectedItem.price ||
-                      (selectedItem.variants?.length
-                        ? Math.min(
-                            ...selectedItem.variants.map((v) => v.price || 0),
-                          )
-                        : 0)}
-                  </span>
-                </div>
-
-                <p className="ps-modal-desc">
-                  {selectedItem.description || "No description available."}
-                </p>
-
-                {selectedItem.variants?.length > 0 && (
-                  <div className="ps-var-list">
-                    <label>Available Options</label>
-                    {selectedItem.variants.map((v) => (
-                      <div key={v._id} className="ps-var-row">
-                        <span>{v.name}</span>
-                        <b className="notranslate" translate="no">
-                          ₹{v.price}
-                        </b>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <button
-                  className="ps-done-btn"
-                  onClick={() => setSelectedItem(null)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ItemSheet item={selectedItem} onClose={() => setSelectedItem(null)} />
       )}
     </div>
   );
 };
-
-const ProductCard = memo(({ item, onOpen, store }) => {
-  const price =
-    item.price ||
-    (item.variants?.length
-      ? Math.min(...item.variants.map((v) => v.price || 0))
-      : 0);
-
-  return (
-    <div
-      className={`ps-card ${!item.isAvailable ? "ps-oos" : ""}`}
-      onClick={() => onOpen(item)}
-    >
-      <div className="ps-card-img">
-        <img
-          src={item.image || store.logo || logo}
-          alt={item.name}
-          loading="lazy"
-        />
-      </div>
-      <div className="ps-card-body">
-        <h4>{item.name}</h4>
-        <div className="ps-card-foot">
-          <span className="ps-price notranslate" translate="no">
-            ₹{price}
-            {item.variants?.length > 0 ? " onwards" : ""}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-});
 
 export default PublicStore;

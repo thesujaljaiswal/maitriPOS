@@ -95,6 +95,7 @@ export default function Register() {
           placeholder="Full Name"
           value={form.fullName}
           onChange={handleChange}
+          required={true}
         />
 
         <input
@@ -102,6 +103,7 @@ export default function Register() {
           placeholder="Username"
           value={form.username}
           onChange={handleChange}
+          required={true}
         />
 
         <input
@@ -110,13 +112,15 @@ export default function Register() {
           placeholder="Email"
           value={form.email}
           onChange={handleChange}
+          required={true}
         />
 
         <input
           name="phone"
-          placeholder="Phone (optional)"
+          placeholder="Phone"
           value={form.phone}
           onChange={handleChange}
+          required={true}
         />
 
         {/* PASSWORD FIELD */}
@@ -127,6 +131,7 @@ export default function Register() {
             placeholder="Password"
             value={form.password}
             onChange={handleChange}
+            required={true}
           />
           <button
             type="button"
@@ -146,6 +151,13 @@ export default function Register() {
             value={form.confirmPassword}
             onChange={handleChange}
           />
+          <button
+            type="button"
+            className="toggle-btn"
+            onClick={() => setShowConfirmPassword(!showPassword)}
+          >
+            {showConfirmPassword ? "Hide" : "Show"}
+          </button>
         </div>
 
         <button type="submit" disabled={loading}>

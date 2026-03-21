@@ -199,7 +199,7 @@ export default function ManageStore() {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                required
+                required={true}
               />
             </div>
 
@@ -219,7 +219,7 @@ export default function ManageStore() {
                     });
                   }}
                   placeholder="e.g. your-store"
-                  required
+                  required={true}
                 />
                 <button
                   type="button"
@@ -250,7 +250,7 @@ export default function ManageStore() {
                 <label>Phone</label>
                 <input
                   value={formData.phone}
-                  required
+                  required={true}
                   onChange={(e) =>
                     setFormData({ ...formData, phone: e.target.value })
                   }
@@ -260,7 +260,7 @@ export default function ManageStore() {
                 <label>Email</label>
                 <input
                   value={formData.email}
-                  required
+                  required={true}
                   onChange={(e) =>
                     setFormData({ ...formData, email: e.target.value })
                   }
@@ -276,6 +276,7 @@ export default function ManageStore() {
                   setFormData({ ...formData, address: e.target.value })
                 }
                 rows="3"
+                required={true}
               />
             </div>
 
