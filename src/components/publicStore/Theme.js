@@ -93,7 +93,7 @@
 //                    summer_vibes | monsoon
 // ════════════════════════════════════════════════════════════════════════════
 
-export const ACTIVE_THEME = "default"; // ← CHANGE ONLY THIS LINE
+export const ACTIVE_THEME = "ram_navami"; // ← CHANGE ONLY THIS LINE
 
 export const THEMES = {
   // ══════════════════════════════════════════════════════════════════════
