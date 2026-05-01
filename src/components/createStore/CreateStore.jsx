@@ -4,6 +4,7 @@ import "./style.css";
 import NavbarLayout from "../navbar/Navbar";
 import { Oval } from "react-loader-spinner";
 import Footer from "../footer/Footer";
+import { THEMES } from "../publicStore/Theme.js";
 
 export default function ManageStore() {
   const navigate = useNavigate();
@@ -20,8 +21,16 @@ export default function ManageStore() {
     phone: "",
     email: "",
     address: "",
+    theme: "default",
+    default_theme: false,
   });
   const [logoPreview, setLogoPreview] = useState(null);
+
+  const sortedThemes = Object.entries(THEMES).sort(([a], [b]) => {
+    const nameA = a.replace(/_/g, " ").toUpperCase();
+    const nameB = b.replace(/_/g, " ").toUpperCase();
+    return nameA.localeCompare(nameB);
+  });
 
   const fetchStore = useCallback(async () => {
     try {
@@ -40,9 +49,11 @@ export default function ManageStore() {
           phone: store.contact?.phone || "",
           email: store.contact?.email || "",
           address: store.address || "",
+          theme: store.theme || "default",
+          default_theme: store.default_theme || false,
         });
         setLogoPreview(store.logo);
-        setSlugStatus("available"); // Existing slug is available to the owner
+        setSlugStatus("available");
       }
     } catch (err) {
       setError("Failed to load store data");
@@ -111,6 +122,8 @@ export default function ManageStore() {
         name: formData.name,
         slug: formData.slug,
         address: formData.address,
+        theme: formData.default_theme ? "" : formData.theme,
+        default_theme: formData.default_theme,
         contact: { phone: formData.phone, email: formData.email },
       };
 
@@ -181,7 +194,6 @@ export default function ManageStore() {
                   )}
                 </div>
 
-                {/* Dedicated Update Button */}
                 <button
                   type="button"
                   className="ms-btn-logo"
@@ -243,6 +255,51 @@ export default function ManageStore() {
                   {slugStatus === "available" ? "✅ Available" : "❌ Taken"}
                 </span>
               )}
+            </div>
+
+            {/* Theme Customizations */}
+            <div className="ms-grid">
+              <div className="ms-input-group">
+                <label>Theme</label>
+                <div className="ms-select-wrapper">
+                  <select
+                    className="ms-styled-select"
+                    value={formData.theme}
+                    disabled={formData.default_theme}
+                    onChange={(e) =>
+                      setFormData({ ...formData, theme: e.target.value })
+                    }
+                  >
+                    {sortedThemes.map(([key]) => (
+                      <option key={key} value={key}>
+                        {key
+                          .replace(/_/g, " ")
+                          .replace(/\b\w/g, (c) => c.toUpperCase())}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* <div className="ms-input-group">
+                <div className="ms-toggle-container">
+                  <span className="ms-toggle-label">Auto-Apply Theme</span>
+                  <label className="ms-switch">
+                    <input
+                      type="checkbox"
+                      checked={formData.default_theme}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          default_theme: e.target.checked,
+                          theme: e.target.checked ? "" : formData.theme,
+                        })
+                      }
+                    />
+                    <span className="ms-slider"></span>
+                  </label>
+                </div>
+              </div> */}
             </div>
 
             <div className="ms-grid">

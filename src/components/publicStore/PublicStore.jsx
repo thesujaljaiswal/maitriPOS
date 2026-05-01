@@ -9,15 +9,14 @@ import React, {
 import logoFallback from "../../assets/maitriPOS ICON 2.jpg";
 import "./style.css";
 import { Oval } from "react-loader-spinner";
-import { getTheme } from "./Theme";
-
-const THEME = getTheme();
+import { getTheme, THEMES } from "./Theme";
 
 /* ────────────────────────────────────────────────────
    Inject all CSS variables + body theme-class
    Called once on mount — no flicker.
 ──────────────────────────────────────────────────── */
-const applyTheme = () => {
+const applyTheme = (customTheme) => {
+  const THEME = customTheme || getTheme();
   const r = document.documentElement;
   r.style.setProperty("--accent", THEME.accent);
   r.style.setProperty("--accent-dark", THEME.accentDark);
@@ -41,7 +40,8 @@ const applyTheme = () => {
 /* ────────────────────────────────────────────────────
    Floating particle layer — emoji drifts down the page
 ──────────────────────────────────────────────────── */
-const ParticleLayer = () => {
+const ParticleLayer = ({ activeTheme }) => {
+  const THEME = activeTheme || getTheme();
   const emoji = THEME.particles;
   const count = Math.min(THEME.particleCount || 0, 20);
   if (!emoji || count === 0) return null;
@@ -57,7 +57,7 @@ const ParticleLayer = () => {
         delay: `${Math.random() * 14}s`,
       })),
     [],
-  ); // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   return (
     <div className="particle-layer" aria-hidden="true">
@@ -95,7 +95,8 @@ const VegDot = () => (
 /* ────────────────────────────────────────────────────
    Festival Banner
 ──────────────────────────────────────────────────── */
-const FestivalBanner = () => {
+const FestivalBanner = ({ activeTheme }) => {
+  const THEME = activeTheme || getTheme();
   const b = THEME.banner;
   if (!b?.show) return null;
   return (
@@ -303,12 +304,41 @@ const PublicStore = ({ slug }) => {
   const [activeTab, setActiveTab] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTheme, setActiveTheme] = useState(getTheme());
   const categoryRefs = useRef({});
+
+  /* fetch */
+  const fetchStore = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`,
+      );
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+
+      const storeThemeKey = json.data.store.theme;
+      let loadedTheme = getTheme(); // Default theme
+
+      if (storeThemeKey && THEMES[storeThemeKey]) {
+        loadedTheme =
+          typeof THEMES[storeThemeKey] === "function"
+            ? THEMES[storeThemeKey]()
+            : THEMES[storeThemeKey];
+      }
+
+      setActiveTheme(loadedTheme);
+      applyTheme(loadedTheme);
+
+      setStoreData(json.data);
+      if (json.data.categories?.length > 0)
+        setActiveTab(json.data.categories[0]._id);
+    } catch {
+      setError("Store not found");
+    }
+  }, [slug]);
 
   /* apply theme + viewport meta on first mount */
   useEffect(() => {
-    applyTheme();
-
     let vp = document.querySelector("meta[name='viewport']");
     if (!vp) {
       vp = document.createElement("meta");
@@ -317,10 +347,12 @@ const PublicStore = ({ slug }) => {
     }
     vp.content = "width=device-width, initial-scale=1, viewport-fit=cover";
 
+    fetchStore();
+
     return () => {
       document.body.classList.remove("theme-light", "theme-dark");
     };
-  }, []);
+  }, [fetchStore]);
 
   /* Escape key closes sheet */
   useEffect(() => {
@@ -343,26 +375,6 @@ const PublicStore = ({ slug }) => {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [storeData]);
-
-  /* fetch */
-  const fetchStore = useCallback(async () => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`,
-      );
-      if (!res.ok) throw new Error();
-      const json = await res.json();
-      setStoreData(json.data);
-      if (json.data.categories?.length > 0)
-        setActiveTab(json.data.categories[0]._id);
-    } catch {
-      setError("Store not found");
-    }
-  }, [slug]);
-
-  useEffect(() => {
-    fetchStore();
-  }, [fetchStore]);
 
   /* browser tab title + favicon */
   useEffect(() => {
@@ -430,8 +442,8 @@ const PublicStore = ({ slug }) => {
     return (
       <div className="state-screen">
         <Oval
-          color={THEME.accent}
-          secondaryColor={THEME.cardBorder}
+          color={activeTheme.accent}
+          secondaryColor={activeTheme.cardBorder}
           strokeWidth={3}
           width={44}
           height={44}
@@ -444,10 +456,10 @@ const PublicStore = ({ slug }) => {
   return (
     <div className="ps-page">
       {/* floating particles */}
-      <ParticleLayer />
+      <ParticleLayer activeTheme={activeTheme} />
 
       {/* festival banner */}
-      <FestivalBanner />
+      <FestivalBanner activeTheme={activeTheme} />
 
       {/* header */}
       <header className="ps-header">
@@ -485,7 +497,7 @@ const PublicStore = ({ slug }) => {
           <input
             type="search"
             placeholder={
-              THEME.banner?.show
+              activeTheme.banner?.show
                 ? `Search ${store.name}...`
                 : "Search anything..."
             }
