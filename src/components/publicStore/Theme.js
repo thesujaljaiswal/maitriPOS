@@ -93,7 +93,7 @@
 //                    summer_vibes | monsoon
 // ════════════════════════════════════════════════════════════════════════════
 
-export const ACTIVE_THEME = "ipl"; // ← CHANGE ONLY THIS LINE
+export const ACTIVE_THEME = "Rakhi"; // ← CHANGE ONLY THIS LINE
 
 export const THEMES = {
   // ══════════════════════════════════════════════════════════════════════
