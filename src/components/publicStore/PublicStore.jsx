@@ -10,6 +10,15 @@ import logoFallback from "../../assets/maitriPOS ICON 2.jpg";
 import "./style.css";
 import { Oval } from "react-loader-spinner";
 import { getTheme, THEMES } from "./Theme";
+import {
+  Share2,
+  Copy,
+  Check,
+  MessageCircle,
+  Instagram,
+  X,
+  ExternalLink,
+} from "lucide-react";
 
 /* ────────────────────────────────────────────────────
    Inject all CSS variables + body theme-class
@@ -305,18 +314,48 @@ const PublicStore = ({ slug }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTheme, setActiveTheme] = useState(getTheme());
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const categoryRefs = useRef({});
 
   /* fetch */
   const fetchStore = useCallback(async () => {
     try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const refParam = urlParams.get("ref");
+      const queryStr = refParam ? `?ref=${encodeURIComponent(refParam)}` : "";
+
       const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}`,
+        `${import.meta.env.VITE_API_BASE_URL}/public/store/${slug}${queryStr}`,
       );
       if (!res.ok) throw new Error();
       const json = await res.json();
+      const store = json.data.store;
 
-      const storeThemeKey = json.data.store.theme;
+      // Check if store slug has changed while customer used an old link with ref
+      if (store.slug && store.slug !== slug) {
+        const host = window.location.hostname;
+        const parts = host.split(".");
+        let newHost = host;
+        if (parts.length > 2) {
+          // e.g. oldslug.maitripos.com -> newslug.maitripos.com
+          parts[0] = store.slug;
+          newHost = parts.join(".");
+        } else if (host.endsWith(".localhost")) {
+          parts[0] = store.slug;
+          newHost = parts.join(".");
+        }
+
+        const newUrl = `${window.location.protocol}//${newHost}${
+          window.location.port ? `:${window.location.port}` : ""
+        }${window.location.pathname}?ref=${store.storeRef || refParam || ""}`;
+
+        // Seamless redirection to current slug without breaking
+        window.location.replace(newUrl);
+        return;
+      }
+
+      const storeThemeKey = store.theme;
       let loadedTheme = getTheme(); // Default theme
 
       if (storeThemeKey && THEMES[storeThemeKey]) {
@@ -453,6 +492,55 @@ const PublicStore = ({ slug }) => {
 
   const { store } = storeData;
 
+  const shareUrl = useMemo(() => {
+    const url = new URL(window.location.href);
+    if (store.storeRef) {
+      url.searchParams.set("ref", store.storeRef);
+    }
+    return url.toString();
+  }, [store.storeRef]);
+
+  const handleShareClick = async () => {
+    const sharePayload = {
+      title: store.name,
+      text: `Order online from ${store.name} on MaitriPOS!`,
+      url: shareUrl,
+    };
+
+    // If native Web Share API is supported and can share, trigger system sheet
+    // (This shows the user's installed apps: WhatsApp, Instagram, Telegram, Messages, etc.)
+    if (navigator.share && navigator.canShare && navigator.canShare(sharePayload)) {
+      try {
+        await navigator.share(sharePayload);
+        return;
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setShareModalOpen(true);
+        }
+      }
+    } else {
+      setShareModalOpen(true);
+    }
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    } catch {
+      // fallback copy
+      const input = document.createElement("input");
+      input.value = shareUrl;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    }
+  };
+
   return (
     <div className="ps-page">
       {/* floating particles */}
@@ -473,7 +561,19 @@ const PublicStore = ({ slug }) => {
             }}
           />
           <div className="ps-header__meta">
-            <h1 className="ps-header__name">{store.name}</h1>
+            <div className="ps-header__title-row">
+              <h1 className="ps-header__name">{store.name}</h1>
+              <button
+                type="button"
+                className="ps-share-btn"
+                onClick={handleShareClick}
+                title="Share store"
+                aria-label="Share store"
+              >
+                <Share2 size={16} />
+                <span>Share</span>
+              </button>
+            </div>
             {store.address && (
               <p className="ps-header__address">📍 {store.address}</p>
             )}
@@ -592,6 +692,95 @@ const PublicStore = ({ slug }) => {
       {/* item detail sheet */}
       {selectedItem && (
         <ItemSheet item={selectedItem} onClose={() => setSelectedItem(null)} />
+      )}
+
+      {/* Share Store Modal (Fallback for Desktop or unsupported devices) */}
+      {shareModalOpen && (
+        <div
+          className="ps-share-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target.classList.contains("ps-share-backdrop")) {
+              setShareModalOpen(false);
+            }
+          }}
+        >
+          <div className="ps-share-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="ps-share-header">
+              <h3>Share Store</h3>
+              <button
+                type="button"
+                className="ps-share-close"
+                onClick={() => setShareModalOpen(false)}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="ps-share-desc">
+              Share this permanent link with your customers:
+            </p>
+
+            <div className="ps-share-url-box">
+              <span className="ps-share-url-text">{shareUrl}</span>
+              <button
+                type="button"
+                className={`ps-share-copy-btn ${copied ? "copied" : ""}`}
+                onClick={copyToClipboard}
+              >
+                {copied ? <Check size={16} /> : <Copy size={16} />}
+                <span>{copied ? "Copied!" : "Copy"}</span>
+              </button>
+            </div>
+
+            <div className="ps-share-grid">
+              <a
+                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                  `Check out ${store.name} menu online: ${shareUrl}`,
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ps-share-option whatsapp"
+              >
+                <div className="ps-share-opt-icon">
+                  <MessageCircle size={22} />
+                </div>
+                <span>WhatsApp</span>
+              </a>
+
+              <a
+                href={`https://www.instagram.com/`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  copyToClipboard();
+                }}
+                className="ps-share-option instagram"
+              >
+                <div className="ps-share-opt-icon">
+                  <Instagram size={22} />
+                </div>
+                <span>Instagram (Copy)</span>
+              </a>
+
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                  `Order from ${store.name} online:`,
+                )}&url=${encodeURIComponent(shareUrl)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ps-share-option twitter"
+              >
+                <div className="ps-share-opt-icon">
+                  <ExternalLink size={20} />
+                </div>
+                <span>X / Twitter</span>
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
