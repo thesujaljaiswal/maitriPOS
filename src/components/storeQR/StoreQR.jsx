@@ -21,6 +21,23 @@ import "./style.css";
 
 const STAND_TEMPLATES = [
   {
+    id: "maitripos-default",
+    name: "MaitriPOS (Default)",
+    cardBg: "#0f172a",
+    border: "#1e293b",
+    textPrimary: "#ffffff",
+    textSecondary: "#93c5fd",
+    badgeBg: "#f59e0b",
+    badgeText: "#000000",
+    qrPlateBg: "#ffffff",
+    bracketColor: "#2563eb",
+    stepNumBg: "#1e293b",
+    stepNumBorder: "#ef4444",
+    bannerBg: "#ffffff",
+    storeNameColor: "#0f172a",
+    taglineColor: "#f59e0b",
+  },
+  {
     id: "forest-green",
     name: "Emerald Forest",
     cardBg: "#0f3d2e",
