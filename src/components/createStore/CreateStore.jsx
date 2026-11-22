@@ -7,7 +7,15 @@ import Footer from "../footer/Footer";
 import { THEMES } from "../publicStore/Theme.js";
 import Cropper from "react-easy-crop";
 import { getCroppedImg } from "./cropImage";
-import { CheckCircle2, AlertCircle, X } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertCircle,
+  X,
+  RotateCw,
+  ZoomIn,
+  ZoomOut,
+  Image as ImageIcon,
+} from "lucide-react";
 
 export default function ManageStore() {
   const navigate = useNavigate();
@@ -54,6 +62,7 @@ export default function ManageStore() {
   const [imageToCrop, setImageToCrop] = useState(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [isCropping, setIsCropping] = useState(false);
 
@@ -130,11 +139,16 @@ export default function ManageStore() {
   const handleLogoFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!file.type.startsWith("image/")) {
+        showDialog("Invalid File", "Please select an image file (PNG, JPG, WEBP, etc.).", "error");
+        return;
+      }
       const reader = new FileReader();
       reader.addEventListener("load", () => {
         setImageToCrop(reader.result);
         setCrop({ x: 0, y: 0 });
         setZoom(1);
+        setRotation(0);
         setCropModalOpen(true);
       });
       reader.readAsDataURL(file);
@@ -150,7 +164,7 @@ export default function ManageStore() {
   const handleSaveCrop = async () => {
     try {
       setIsCropping(true);
-      const croppedBlob = await getCroppedImg(imageToCrop, croppedAreaPixels);
+      const croppedBlob = await getCroppedImg(imageToCrop, croppedAreaPixels, rotation);
       const croppedFile = new File([croppedBlob], "store-logo.jpg", {
         type: "image/jpeg",
       });
@@ -471,16 +485,39 @@ export default function ManageStore() {
 
       {/* Image Cropper Modal */}
       {cropModalOpen && (
-        <div className="ms-crop-modal" role="dialog" aria-modal="true">
-          <div className="ms-crop-card">
+        <div
+          className="ms-crop-modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target.classList.contains("ms-crop-modal") && !isCropping) {
+              setCropModalOpen(false);
+              setImageToCrop(null);
+            }
+          }}
+        >
+          <div className="ms-crop-card" onClick={(e) => e.stopPropagation()}>
             <div className="ms-crop-header">
-              <h3>Crop Store Logo</h3>
+              <div className="ms-crop-header-left">
+                <div className="ms-crop-header-badge">
+                  <ImageIcon size={16} />
+                </div>
+                <div>
+                  <h3>Adjust Logo</h3>
+                  <p className="ms-crop-subtitle">
+                    Drag to reposition, pinch or use controls to zoom & rotate
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 className="ms-dialog-close-btn"
+                aria-label="Close"
                 onClick={() => {
-                  setCropModalOpen(false);
-                  setImageToCrop(null);
+                  if (!isCropping) {
+                    setCropModalOpen(false);
+                    setImageToCrop(null);
+                  }
                 }}
               >
                 <X size={20} />
@@ -492,9 +529,13 @@ export default function ManageStore() {
                 image={imageToCrop}
                 crop={crop}
                 zoom={zoom}
+                rotation={rotation}
                 aspect={1}
                 cropShape="round"
                 showGrid={false}
+                zoomSpeed={0.5}
+                minZoom={1}
+                maxZoom={3}
                 onCropChange={setCrop}
                 onZoomChange={setZoom}
                 onCropComplete={onCropComplete}
@@ -502,16 +543,59 @@ export default function ManageStore() {
             </div>
 
             <div className="ms-crop-controls">
-              <div className="ms-crop-slider-row">
-                <span>Zoom</span>
-                <input
-                  type="range"
-                  min={1}
-                  max={3}
-                  step={0.1}
-                  value={zoom}
-                  onChange={(e) => setZoom(Number(e.target.value))}
-                />
+              <div className="ms-crop-toolbar">
+                <div className="ms-crop-slider-row">
+                  <button
+                    type="button"
+                    className="ms-crop-tool-btn"
+                    title="Zoom out"
+                    onClick={() => setZoom((z) => Math.max(1, +(z - 0.1).toFixed(1)))}
+                  >
+                    <ZoomOut size={16} />
+                  </button>
+                  <input
+                    type="range"
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    value={zoom}
+                    aria-label="Zoom level"
+                    onChange={(e) => setZoom(Number(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    className="ms-crop-tool-btn"
+                    title="Zoom in"
+                    onClick={() => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(1)))}
+                  >
+                    <ZoomIn size={16} />
+                  </button>
+                  <span className="ms-crop-zoom-label">{zoom.toFixed(1)}x</span>
+                </div>
+
+                <div className="ms-crop-extra-tools">
+                  <button
+                    type="button"
+                    className="ms-crop-rotate-btn"
+                    onClick={() => setRotation((r) => (r + 90) % 360)}
+                    title="Rotate 90 degrees"
+                  >
+                    <RotateCw size={15} />
+                    <span>Rotate</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="ms-crop-reset-btn"
+                    onClick={() => {
+                      setCrop({ x: 0, y: 0 });
+                      setZoom(1);
+                      setRotation(0);
+                    }}
+                    title="Reset to default"
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
 
               <div className="ms-crop-actions">
