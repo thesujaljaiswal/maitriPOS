@@ -352,20 +352,26 @@ export default function ManageStore() {
 
             <div className="ms-input-group">
               <label>
-                Store Slug (Please use text and number and avoid using special
-                characters)
+                Store Slug (Only lowercase letters, numbers, and hyphens)
               </label>
               <div className="ms-slug-row">
                 <input
                   value={formData.slug}
                   onChange={(e) => {
                     setSlugStatus(null);
+                    // Sanitize input: convert to lowercase, spaces to hyphens, remove any emoji or special characters except a-z, 0-9, and hyphen
+                    const sanitized = e.target.value
+                      .toLowerCase()
+                      .replace(/\s+/g, "-")
+                      .replace(/[^a-z0-9-]/g, "")
+                      .replace(/-+/g, "-");
                     setFormData({
                       ...formData,
-                      slug: e.target.value.toLowerCase().replace(/\s+/g, "-"),
+                      slug: sanitized,
                     });
                   }}
-                  placeholder="e.g. your-store"
+                  placeholder="e.g. jaiswaldairyfarm"
+                  maxLength={30}
                   required={true}
                 />
                 <button
@@ -378,7 +384,7 @@ export default function ManageStore() {
                 </button>
               </div>
               <div className="ms-slug-preview">
-                <span>Your site will available be at: </span>
+                <span>Your site will be available at: </span>
                 <strong
                   className={slugStatus === "available" ? "text-success" : ""}
                 >
