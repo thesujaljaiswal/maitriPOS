@@ -402,14 +402,21 @@ const PublicStore = ({ slug }) => {
 
   /* scroll spy — update active tab */
   useEffect(() => {
+    let ticking = false;
     const onScroll = () => {
-      const offset = window.innerWidth >= 768 ? 170 : 150;
-      const y = window.scrollY + offset;
-      let cur = null;
-      Object.entries(categoryRefs.current).forEach(([id, el]) => {
-        if (el && el.offsetTop <= y) cur = id;
-      });
-      if (cur) setActiveTab(cur);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const offset = window.innerWidth >= 768 ? 170 : 150;
+          const y = window.scrollY + offset;
+          let cur = null;
+          Object.entries(categoryRefs.current).forEach(([id, el]) => {
+            if (el && el.offsetTop <= y) cur = id;
+          });
+          if (cur) setActiveTab((prev) => (prev !== cur ? cur : prev));
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -467,6 +474,15 @@ const PublicStore = ({ slug }) => {
       .filter((cat) => cat.subCategories.length > 0);
   }, [storeData, searchQuery]);
 
+  const shareUrl = useMemo(() => {
+    if (!storeData?.store) return "";
+    const url = new URL(window.location.href);
+    if (storeData.store.storeRef) {
+      url.searchParams.set("ref", storeData.store.storeRef);
+    }
+    return url.toString();
+  }, [storeData?.store?.storeRef]);
+
   /* ── states ── */
   if (error)
     return (
@@ -491,14 +507,6 @@ const PublicStore = ({ slug }) => {
     );
 
   const { store } = storeData;
-
-  const shareUrl = useMemo(() => {
-    const url = new URL(window.location.href);
-    if (store.storeRef) {
-      url.searchParams.set("ref", store.storeRef);
-    }
-    return url.toString();
-  }, [store.storeRef]);
 
   const handleShareClick = async () => {
     const sharePayload = {
