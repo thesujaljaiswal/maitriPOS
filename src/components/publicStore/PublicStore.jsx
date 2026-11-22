@@ -346,13 +346,25 @@ const PublicStore = ({ slug }) => {
           newHost = parts.join(".");
         }
 
+        // Redirect to new subdomain without keeping the ref in address bar once resolved
         const newUrl = `${window.location.protocol}//${newHost}${
           window.location.port ? `:${window.location.port}` : ""
-        }${window.location.pathname}?ref=${store.storeRef || refParam || ""}`;
+        }${window.location.pathname}`;
 
         // Seamless redirection to current slug without breaking
         window.location.replace(newUrl);
         return;
+      }
+
+      // If we are already on the proper slug and ?ref was in the URL, clean it from the address bar
+      if (refParam && window.history && window.history.replaceState) {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete("ref");
+        window.history.replaceState(
+          window.history.state,
+          "",
+          cleanUrl.pathname + (cleanUrl.search ? cleanUrl.search : "") + cleanUrl.hash,
+        );
       }
 
       const storeThemeKey = store.theme;
