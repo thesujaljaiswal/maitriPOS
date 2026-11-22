@@ -22,7 +22,7 @@ import "./style.css";
 const STAND_TEMPLATES = [
   {
     id: "maitripos-default",
-    name: "MaitriPOS (Default)",
+    name: "MaitriPOS Theme",
     cardBg: "#0f172a",
     border: "#1e293b",
     textPrimary: "#ffffff",
