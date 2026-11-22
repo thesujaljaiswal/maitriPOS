@@ -4,12 +4,14 @@ import { NavLink, Link, Outlet, useNavigate } from "react-router-dom";
 import "./style.css";
 import icon from "../../assets/maitriPOS FAVICON.png";
 import { Oval } from "react-loader-spinner";
+import StoreQRModal from "./StoreQRModal";
 
 export default function NavbarLayout() {
   const navigate = useNavigate();
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasStore, setHasStore] = useState(false);
+  const [storeData, setStoreData] = useState(null);
   const [storeSlug, setStoreSlug] = useState("");
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -19,8 +21,10 @@ export default function NavbarLayout() {
   const [plan, setPlan] = useState("ARAMBH");
   const [planExpiresAt, setPlanExpiresAt] = useState(null);
 
+  const [isStoreOpen, setIsStoreOpen] = useState(false);
   const [isProductOpen, setIsProductOpen] = useState(false);
   const [isBusinessOpen, setIsBusinessOpen] = useState(false);
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
   const isMounted = useRef(true);
   const dropdownRef = useRef(null);
@@ -59,6 +63,7 @@ export default function NavbarLayout() {
   const closeMenu = useCallback(() => {
     setIsMobileMenuOpen(false);
     setIsDropdownOpen(false);
+    setIsStoreOpen(false);
     setIsProductOpen(false);
     setIsBusinessOpen(false);
   }, []);
@@ -138,9 +143,11 @@ export default function NavbarLayout() {
         result.data.length > 0
       ) {
         setHasStore(true);
+        setStoreData(result.data[0]);
         setStoreSlug(result.data[0]?.slug || "");
       } else {
         setHasStore(false);
+        setStoreData(null);
         setStoreSlug("");
       }
     } catch (err) {
@@ -173,6 +180,12 @@ export default function NavbarLayout() {
   };
 
   // ✅ dropdown hover for desktop, click for mobile
+  const onStoreEnter = () => {
+    if (!isMobile) setIsStoreOpen(true);
+  };
+  const onStoreLeave = () => {
+    if (!isMobile) setIsStoreOpen(false);
+  };
   const onProductEnter = () => {
     if (!isMobile) setIsProductOpen(true);
   };
@@ -186,6 +199,9 @@ export default function NavbarLayout() {
     if (!isMobile) setIsBusinessOpen(false);
   };
 
+  const toggleStore = () => {
+    if (isMobile) setIsStoreOpen((p) => !p);
+  };
   const toggleProduct = () => {
     if (isMobile) setIsProductOpen((p) => !p);
   };
@@ -247,13 +263,42 @@ export default function NavbarLayout() {
 
               {isAuthenticated ? (
                 <>
-                  <NavLink
-                    to="/create/store"
-                    className={navClass}
-                    onClick={closeMenu}
-                  >
-                    {hasStore ? "Store Settings" : "Setup Store"}
-                  </NavLink>
+                  {hasStore ? (
+                    <div
+                      className="mp-nav-dropdown"
+                      onMouseEnter={onStoreEnter}
+                      onMouseLeave={onStoreLeave}
+                    >
+                      <button
+                        type="button"
+                        className="mp-navbar-link mp-dropdown-trigger"
+                        onClick={toggleStore}
+                      >
+                        Store <small>▾</small>
+                      </button>
+
+                      <div
+                        className={`mp-nav-dropdown-content ${
+                          isStoreOpen ? "show" : ""
+                        }`}
+                      >
+                        <Link to="/create/store" onClick={closeMenu}>
+                          Store Settings
+                        </Link>
+                        <Link to="/store/qr" onClick={closeMenu}>
+                          My QR
+                        </Link>
+                      </div>
+                    </div>
+                  ) : (
+                    <NavLink
+                      to="/create/store"
+                      className={navClass}
+                      onClick={closeMenu}
+                    >
+                      Setup Store
+                    </NavLink>
+                  )}
 
                   {hasStore && storeSlug ? (
                     <a
@@ -434,6 +479,13 @@ export default function NavbarLayout() {
       <main style={{ marginTop: "70px" }}>
         <Outlet context={{ hasStore, isAuthenticated, checkStatus }} />
       </main>
+
+      {/* Store QR Standee Modal */}
+      <StoreQRModal
+        isOpen={isQRModalOpen}
+        onClose={() => setIsQRModalOpen(false)}
+        store={storeData}
+      />
     </div>
   );
 }

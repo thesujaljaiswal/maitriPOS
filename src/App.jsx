@@ -15,6 +15,7 @@ import OrdersPage from "./components/order/OrdersPage.jsx";
 import OrderDetails from "./components/order/OrderDetails.jsx";
 import Analytics from "./components/analytics/Analytics.jsx";
 import ExpenseTracker from "./components/expenseTracker/ExpenseTracker.jsx";
+import StoreQR from "./components/storeQR/StoreQR.jsx";
 
 function App() {
   const slug = getStoreSlug();
@@ -35,6 +36,7 @@ function App() {
 
       {/* OWNER */}
       <Route path="/create/store" element={<CreateStore />} />
+      <Route path="/store/qr" element={<StoreQR />} />
       <Route path="/manage/categories" element={<ManageCategories />} />
       <Route path="/manage/items" element={<ManageItems />} />
       <Route path="/orders" element={<OrdersPage />} />

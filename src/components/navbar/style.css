@@ -125,14 +125,24 @@
   display: flex;
 }
 
-.mp-nav-dropdown-content a {
+.mp-nav-dropdown-content a,
+.mp-dropdown-action-btn {
   text-decoration: none;
   color: #444;
   font-size: 14px;
   padding: 10px 10px;
   border-radius: 8px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  width: 100%;
+  box-sizing: border-box;
 }
-.mp-nav-dropdown-content a:hover {
+.mp-nav-dropdown-content a:hover,
+.mp-dropdown-action-btn:hover {
   background: #f6f6f6;
   color: #000;
 }
