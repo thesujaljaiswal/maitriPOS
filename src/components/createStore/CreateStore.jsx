@@ -5,6 +5,9 @@ import NavbarLayout from "../navbar/Navbar";
 import { Oval } from "react-loader-spinner";
 import Footer from "../footer/Footer";
 import { THEMES } from "../publicStore/Theme.js";
+import Cropper from "react-easy-crop";
+import { getCroppedImg } from "./cropImage";
+import { CheckCircle2, AlertCircle, X } from "lucide-react";
 
 export default function ManageStore() {
   const navigate = useNavigate();
@@ -14,6 +17,45 @@ export default function ManageStore() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [storeId, setStoreId] = useState(null);
   const [slugStatus, setSlugStatus] = useState(null);
+
+  // Custom Dialog Box State
+  const [dialog, setDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info", // "success" | "error" | "info"
+    onClose: null,
+  });
+
+  const showDialog = (title, message, type = "info", onClose = null) => {
+    setDialog({
+      isOpen: true,
+      title,
+      message,
+      type,
+      onClose,
+    });
+  };
+
+  const closeDialog = () => {
+    const callback = dialog.onClose;
+    setDialog({
+      isOpen: false,
+      title: "",
+      message: "",
+      type: "info",
+      onClose: null,
+    });
+    if (callback) callback();
+  };
+
+  // Image Cropper States
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [isCropping, setIsCropping] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -25,6 +67,7 @@ export default function ManageStore() {
     default_theme: false,
   });
   const [logoPreview, setLogoPreview] = useState(null);
+  const [pendingLogoFile, setPendingLogoFile] = useState(null);
 
   const sortedThemes = Object.entries(THEMES).sort(([a], [b]) => {
     const nameA = a.replace(/_/g, " ").toUpperCase();
@@ -84,6 +127,51 @@ export default function ManageStore() {
     }
   };
 
+  const handleLogoFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        setImageToCrop(reader.result);
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
+        setCropModalOpen(true);
+      });
+      reader.readAsDataURL(file);
+    }
+    // Reset file input so user can pick the same file again if desired
+    e.target.value = "";
+  };
+
+  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const handleSaveCrop = async () => {
+    try {
+      setIsCropping(true);
+      const croppedBlob = await getCroppedImg(imageToCrop, croppedAreaPixels);
+      const croppedFile = new File([croppedBlob], "store-logo.jpg", {
+        type: "image/jpeg",
+      });
+
+      const previewUrl = URL.createObjectURL(croppedBlob);
+      setLogoPreview(previewUrl);
+      setPendingLogoFile(croppedFile);
+      setCropModalOpen(false);
+      setImageToCrop(null);
+
+      // If existing store in edit mode, upload right away
+      if (isEditMode && storeId) {
+        await handleLogoUpdate(croppedFile);
+      }
+    } catch (err) {
+      showDialog("Crop Failed", "Could not crop the image. Please try again.", "error");
+    } finally {
+      setIsCropping(false);
+    }
+  };
+
   const handleLogoUpdate = async (file) => {
     if (!isEditMode || !storeId) return;
     setActionLoading(true);
@@ -101,9 +189,14 @@ export default function ManageStore() {
       if (!res.ok) throw new Error("Logo update failed");
       const result = await res.json();
       setLogoPreview(result.data.logo);
-      alert("Logo updated!");
+      showDialog(
+        "Logo Updated",
+        "Your store logo has been updated successfully!",
+        "success"
+      );
     } catch (err) {
       setError(err.message);
+      showDialog("Update Failed", err.message || "Failed to update logo.", "error");
     } finally {
       setActionLoading(false);
     }
@@ -112,7 +205,11 @@ export default function ManageStore() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (slugStatus !== "available") {
-      alert("Please verify slug availability first.");
+      showDialog(
+        "Invalid Slug",
+        "Please verify that your store slug is available before saving.",
+        "error"
+      );
       return;
     }
 
@@ -139,10 +236,40 @@ export default function ManageStore() {
       });
 
       if (!res.ok) throw new Error("Operation failed");
-      alert(isEditMode ? "Store updated" : "Store created");
-      if (!isEditMode) navigate("/");
+      const result = await res.json();
+      const newStoreId = result.data?._id || storeId;
+
+      // In create mode, if user cropped a logo, upload it now
+      if (!isEditMode && pendingLogoFile && newStoreId) {
+        try {
+          const logoData = new FormData();
+          logoData.append("logo", pendingLogoFile);
+          await fetch(
+            `${import.meta.env.VITE_API_BASE_URL}/store/${newStoreId}/logo`,
+            {
+              method: "PUT",
+              body: logoData,
+              credentials: "include",
+            }
+          );
+        } catch (logoErr) {
+          console.error("Failed to upload logo during store creation:", logoErr);
+        }
+      }
+
+      showDialog(
+        "Success",
+        isEditMode
+          ? "Store settings updated successfully!"
+          : "Your store has been created successfully!",
+        "success",
+        () => {
+          if (!isEditMode) navigate("/");
+        }
+      );
     } catch (err) {
       setError(err.message);
+      showDialog("Operation Failed", err.message || "Could not save store settings.", "error");
     } finally {
       setActionLoading(false);
     }
@@ -179,13 +306,7 @@ export default function ManageStore() {
                     id="storeLogo"
                     hidden
                     accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        setLogoPreview(URL.createObjectURL(file));
-                        if (isEditMode) handleLogoUpdate(file);
-                      }
-                    }}
+                    onChange={handleLogoFileSelect}
                   />
                   {logoPreview ? (
                     <img src={logoPreview} alt="Logo" />
@@ -199,7 +320,7 @@ export default function ManageStore() {
                   className="ms-btn-logo"
                   onClick={() => document.getElementById("storeLogo").click()}
                 >
-                  {logoPreview ? "Update Logo" : "Add Logo"}
+                  {logoPreview ? "Change Logo" : "Add Logo"}
                 </button>
               </div>
             </div>
@@ -347,6 +468,119 @@ export default function ManageStore() {
           </form>
         </div>
       </div>
+
+      {/* Image Cropper Modal */}
+      {cropModalOpen && (
+        <div className="ms-crop-modal" role="dialog" aria-modal="true">
+          <div className="ms-crop-card">
+            <div className="ms-crop-header">
+              <h3>Crop Store Logo</h3>
+              <button
+                type="button"
+                className="ms-dialog-close-btn"
+                onClick={() => {
+                  setCropModalOpen(false);
+                  setImageToCrop(null);
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="ms-crop-area">
+              <Cropper
+                image={imageToCrop}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                cropShape="round"
+                showGrid={false}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+              />
+            </div>
+
+            <div className="ms-crop-controls">
+              <div className="ms-crop-slider-row">
+                <span>Zoom</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={3}
+                  step={0.1}
+                  value={zoom}
+                  onChange={(e) => setZoom(Number(e.target.value))}
+                />
+              </div>
+
+              <div className="ms-crop-actions">
+                <button
+                  type="button"
+                  className="ms-crop-btn-cancel"
+                  onClick={() => {
+                    setCropModalOpen(false);
+                    setImageToCrop(null);
+                  }}
+                  disabled={isCropping}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="ms-crop-btn-save"
+                  onClick={handleSaveCrop}
+                  disabled={isCropping}
+                >
+                  {isCropping ? "Saving..." : "Apply & Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Application Dialog Box */}
+      {dialog.isOpen && (
+        <div className="ms-dialog-backdrop" role="dialog" aria-modal="true">
+          <div className="ms-dialog-card">
+            <div className="ms-dialog-header">
+              <div className="ms-dialog-header-title">
+                <div className={`ms-dialog-icon ${dialog.type}`}>
+                  {dialog.type === "success" ? (
+                    <CheckCircle2 size={18} />
+                  ) : (
+                    <AlertCircle size={18} />
+                  )}
+                </div>
+                <h3>{dialog.title}</h3>
+              </div>
+              <button
+                type="button"
+                className="ms-dialog-close-btn"
+                onClick={closeDialog}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="ms-dialog-body">
+              <p>{dialog.message}</p>
+            </div>
+
+            <div className="ms-dialog-actions">
+              <button
+                type="button"
+                className="ms-dialog-primary-btn"
+                onClick={closeDialog}
+              >
+                Okay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </>
   );
