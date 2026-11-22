@@ -13,6 +13,7 @@
     "axios": "^1.13.2",
     "boneyard-js": "^1.8.1",
     "lucide-react": "^0.562.0",
+    "node-forge": "^1.4.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-easy-crop": "^6.2.5",

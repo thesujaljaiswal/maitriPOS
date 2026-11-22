@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "./style.css";
 import NavbarLayout from "../navbar/Navbar";
 import Footer from "../footer/Footer";
+import { encryptSensitiveData } from "../../utils/encryption";
 
 export default function Account() {
   const navigate = useNavigate();
@@ -163,12 +164,19 @@ export default function Account() {
     setLoading(true);
 
     try {
+      // Encrypt sensitive passwords before transmission
+      const encryptedOldPassword = await encryptSensitiveData(passwordData.oldPassword);
+      const encryptedNewPassword = await encryptSensitiveData(passwordData.newPassword);
+
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/change-password`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(passwordData),
+          body: JSON.stringify({
+            oldPassword: encryptedOldPassword,
+            newPassword: encryptedNewPassword,
+          }),
           credentials: "include",
         },
       );

@@ -4,6 +4,7 @@ import { Oval } from "react-loader-spinner";
 import "./style.css";
 import NavbarLayout from "./navbar/Navbar";
 import Footer from "./footer/Footer";
+import { encryptSensitiveData } from "../utils/encryption";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -51,6 +52,9 @@ export default function Register() {
       setLoading(true);
       setError("");
 
+      // Encrypt password using RSA 2048 with SHA-256 before transmitting over HTTP
+      const encryptedPassword = await encryptSensitiveData(form.password);
+
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/auth/register`,
         {
@@ -60,7 +64,7 @@ export default function Register() {
             fullName: form.fullName,
             username: form.username,
             email: form.email,
-            password: form.password,
+            password: encryptedPassword,
             phone: form.phone,
           }),
         },
