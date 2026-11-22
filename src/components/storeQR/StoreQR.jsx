@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
+import { toPng } from "html-to-image";
 import NavbarLayout from "../navbar/Navbar";
 import Footer from "../footer/Footer";
 import { Oval } from "react-loader-spinner";
@@ -251,230 +252,33 @@ export default function StoreQR() {
     }
   };
 
-  const handleDownloadStandee = () => {
-    if (!qrUrl) return;
+  const handleDownloadStandee = async () => {
+    if (!standeeRef.current || isDownloading) return;
     setIsDownloading(true);
 
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const scale = 3; // 3x ultra-high-definition for professional store printing
+    try {
+      // Use html-to-image with pixelRatio: 3 for ultra-HD crisp print output
+      // This guarantees 100% exact visual parity with the on-screen card preview!
+      const dataUrl = await toPng(standeeRef.current, {
+        pixelRatio: 3,
+        cacheBust: true,
+        style: {
+          borderRadius: "24px",
+          transform: "none",
+        },
+      });
 
-    const width = 500 * scale;
-    const height = 750 * scale;
-    canvas.width = width;
-    canvas.height = height;
-
-    // Outer Background
-    ctx.fillStyle = selectedTemplate.cardBg;
-    ctx.fillRect(0, 0, width, height);
-
-    // Title: "Scan to View" & "Our Menu"
-    ctx.fillStyle = selectedTemplate.textPrimary;
-    ctx.font = `900 ${36 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.fillText("Scan to View", 250 * scale, 64 * scale);
-    ctx.fillText("Our Menu", 250 * scale, 108 * scale);
-
-    // QR Inner Cream Plate (Square)
-    const plateX = 85 * scale;
-    const plateY = 145 * scale;
-    const plateSize = 330 * scale;
-
-    ctx.fillStyle = selectedTemplate.qrPlateBg;
-    ctx.fillRect(plateX, plateY, plateSize, plateSize);
-
-    // Corner Focus Brackets
-    const bracketLen = 38 * scale;
-    const bracketThick = 5 * scale;
-    const bracketOffset = 22 * scale;
-    const bColor = selectedTemplate.bracketColor;
-
-    ctx.fillStyle = bColor;
-    // Top-Left
-    ctx.fillRect(plateX + bracketOffset, plateY + bracketOffset, bracketLen, bracketThick);
-    ctx.fillRect(plateX + bracketOffset, plateY + bracketOffset, bracketThick, bracketLen);
-    // Top-Right
-    ctx.fillRect(plateX + plateSize - bracketOffset - bracketLen, plateY + bracketOffset, bracketLen, bracketThick);
-    ctx.fillRect(plateX + plateSize - bracketOffset - bracketThick, plateY + bracketOffset, bracketThick, bracketLen);
-    // Bottom-Left
-    ctx.fillRect(plateX + bracketOffset, plateY + plateSize - bracketOffset - bracketThick, bracketLen, bracketThick);
-    ctx.fillRect(plateX + bracketOffset, plateY + plateSize - bracketOffset - bracketLen, bracketThick, bracketLen);
-    // Bottom-Right
-    ctx.fillRect(plateX + plateSize - bracketOffset - bracketLen, plateY + plateSize - bracketOffset - bracketThick, bracketLen, bracketThick);
-    ctx.fillRect(plateX + plateSize - bracketOffset - bracketThick, plateY + plateSize - bracketOffset - bracketLen, bracketThick, bracketLen);
-
-    // Draw SVG QR into Image
-    const svgElement = document.getElementById("store-qr-page-svg");
-    if (!svgElement) {
+      const downloadLink = document.createElement("a");
+      downloadLink.href = dataUrl;
+      downloadLink.download = `${storeSlug || "store"}-standee-${selectedTemplate.id}.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    } catch (err) {
+      console.error("Failed to generate image from preview", err);
+    } finally {
       setIsDownloading(false);
-      return;
     }
-
-    const svgData = new XMLSerializer().serializeToString(svgElement);
-    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-    const URLObject = window.URL || window.webkitURL || window;
-    const blobURL = URLObject.createObjectURL(svgBlob);
-
-    const qrImage = new Image();
-    qrImage.onload = () => {
-      // Draw QR centered inside the plate
-      const qrDrawSize = 220 * scale;
-      ctx.drawImage(qrImage, 140 * scale, 200 * scale, qrDrawSize, qrDrawSize);
-      URLObject.revokeObjectURL(blobURL);
-
-      // --- 3 STEPS ROW ---
-      const stepsY = 515 * scale;
-      const colWidth = 125 * scale;
-      const col1X = 90 * scale;
-      const col2X = 250 * scale;
-      const col3X = 410 * scale;
-
-      // Vertical dashed dividers
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-      ctx.setLineDash([4 * scale, 4 * scale]);
-      ctx.lineWidth = 1.5 * scale;
-      ctx.beginPath();
-      ctx.moveTo(170 * scale, 500 * scale);
-      ctx.lineTo(170 * scale, 580 * scale);
-      ctx.moveTo(330 * scale, 500 * scale);
-      ctx.lineTo(330 * scale, 580 * scale);
-      ctx.stroke();
-      ctx.setLineDash([]); // Reset dash
-
-      // Helper function to draw circular step badge
-      const drawStepBadge = (cx, cy, num) => {
-        ctx.fillStyle = selectedTemplate.stepNumBg;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 14 * scale, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = selectedTemplate.textPrimary;
-        ctx.font = `bold ${12 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.fillText(num, cx, cy + 4.5 * scale);
-      };
-
-      // Helper function to draw multiline text
-      const drawStepText = (text, cx, startY) => {
-        ctx.fillStyle = selectedTemplate.textPrimary;
-        ctx.font = `400 ${10.5 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-        ctx.textAlign = "center";
-        const words = text.split(" ");
-        let line = "";
-        let y = startY;
-        for (let n = 0; n < words.length; n++) {
-          const testLine = line + words[n] + " ";
-          const metrics = ctx.measureText(testLine);
-          if (metrics.width > colWidth && n > 0) {
-            ctx.fillText(line.trim(), cx, y);
-            line = words[n] + " ";
-            y += 14 * scale;
-          } else {
-            line = testLine;
-          }
-        }
-        ctx.fillText(line.trim(), cx, y);
-      };
-
-      // Step 1
-      drawStepBadge(col1X, stepsY, "1");
-      drawStepText("Use your phone camera to scan the QR code on this sign.", col1X, stepsY + 26 * scale);
-
-      // Step 2
-      drawStepBadge(col2X, stepsY, "2");
-      drawStepText("View our complete range, crafted for every preference.", col2X, stepsY + 26 * scale);
-
-      // Step 3
-      drawStepBadge(col3X, stepsY, "3");
-      drawStepText("Place your order at the counter or simply let us know!", col3X, stepsY + 26 * scale);
-
-      // --- BOTTOM BRAND BANNER ---
-      const bannerY = 615 * scale;
-      const bannerHeight = 75 * scale;
-      ctx.fillStyle = selectedTemplate.bannerBg;
-      ctx.fillRect(0, bannerY, width, bannerHeight);
-
-      // Store Name (Left side of banner - multi-line wrapped so full name always displays cleanly)
-      ctx.fillStyle = selectedTemplate.storeNameColor;
-      const storeNameUpper = storeName.toUpperCase();
-      const words = storeNameUpper.split(" ");
-      let lines = [];
-      if (words.length > 2) {
-        const mid = Math.ceil(words.length / 2);
-        lines = [words.slice(0, mid).join(" "), words.slice(mid).join(" ")];
-      } else if (words.length === 2 && storeNameUpper.length > 14) {
-        lines = [words[0], words[1]];
-      } else {
-        lines = [storeNameUpper];
-      }
-
-      ctx.textAlign = "center";
-      const storeCenterX = 135 * scale;
-      if (lines.length === 1) {
-        const fontSize = lines[0].length > 14 ? 16 : 18;
-        ctx.font = `800 ${fontSize * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif`;
-        ctx.fillText(lines[0], storeCenterX, bannerY + 43 * scale);
-      } else {
-        ctx.font = `800 ${15 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif`;
-        ctx.fillText(lines[0], storeCenterX, bannerY + 34 * scale);
-        ctx.fillText(lines[1], storeCenterX, bannerY + 52 * scale);
-      }
-
-      // Vertical Divider inside banner
-      ctx.strokeStyle = "#94a3b8";
-      ctx.lineWidth = 1.5 * scale;
-      ctx.globalAlpha = 0.6;
-      ctx.beginPath();
-      ctx.moveTo(250 * scale, bannerY + 16 * scale);
-      ctx.lineTo(250 * scale, bannerY + bannerHeight - 16 * scale);
-      ctx.stroke();
-      ctx.globalAlpha = 1.0;
-
-      // MaitriPOS Logo (Right side of banner)
-      const iconX = 275 * scale;
-      const iconY = bannerY + 22 * scale;
-      const logoImg = new Image();
-      logoImg.crossOrigin = "anonymous";
-      logoImg.onload = () => {
-        ctx.drawImage(logoImg, iconX, iconY, 28 * scale, 30 * scale);
-        finishCanvas();
-      };
-      logoImg.onerror = () => {
-        // Fallback drawing if image fails to load
-        ctx.fillStyle = "#ef4444";
-        ctx.fillRect(iconX + 12 * scale, iconY, 14 * scale, 14 * scale);
-        ctx.fillStyle = "#eab308";
-        ctx.fillRect(iconX, iconY + 14 * scale, 12 * scale, 14 * scale);
-        ctx.fillStyle = "#3b82f6";
-        ctx.fillRect(iconX + 12 * scale, iconY + 14 * scale, 14 * scale, 14 * scale);
-        finishCanvas();
-      };
-      logoImg.src = maitriLogoCubes;
-
-      function finishCanvas() {
-        ctx.fillStyle = "#0f172a";
-        ctx.font = `800 ${20 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif`;
-        ctx.textAlign = "left";
-        ctx.fillText("maitriPOS™", iconX + 36 * scale, bannerY + 44 * scale);
-
-        // Footer: Powered by maitriPOS.com
-        ctx.fillStyle = selectedTemplate.taglineColor;
-        ctx.font = `600 ${12 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.fillText("Powered by maitriPOS.com", 250 * scale, 720 * scale);
-
-        // Download PNG
-        const pngUrl = canvas.toDataURL("image/png");
-        const downloadLink = document.createElement("a");
-        downloadLink.href = pngUrl;
-        downloadLink.download = `${storeSlug}-standee-${selectedTemplate.id}.png`;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-        setIsDownloading(false);
-      }
-    };
-    qrImage.src = blobURL;
   };
 
   const handlePrint = () => {
