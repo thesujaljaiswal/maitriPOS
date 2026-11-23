@@ -347,9 +347,8 @@ const PublicStore = ({ slug }) => {
         }
 
         // Redirect to new subdomain without keeping the ref in address bar once resolved
-        const newUrl = `${window.location.protocol}//${newHost}${
-          window.location.port ? `:${window.location.port}` : ""
-        }${window.location.pathname}`;
+        const newUrl = `${window.location.protocol}//${newHost}${window.location.port ? `:${window.location.port}` : ""
+          }${window.location.pathname}`;
 
         // Seamless redirection to current slug without breaking
         window.location.replace(newUrl);
@@ -523,7 +522,7 @@ const PublicStore = ({ slug }) => {
   const handleShareClick = async () => {
     const sharePayload = {
       title: store.name,
-      text: `Order online from ${store.name} on MaitriPOS!`,
+      text: `View online menu of ${store.name} on MaitriPOS!`,
       url: shareUrl,
     };
 
